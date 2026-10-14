@@ -1,0 +1,100 @@
+Chmahastic Reverb 2 — mrelwood plugins
+Page: https://mrelwood5.wixsite.com/plugins
+(Chmahastic Reverb has no individual page; it is listed under Others in
+the mrelwood plugin list and ships inside the free mrelwood_PluginPack.
+DSP is built on Airwindows' Verbity2 / Verbity (MIT), wrapped as a JSFX
+and enlarged for scratch-modelling / denser per-program spaces.)
+
+What it is: a very versatile feedback-matrix reverb: a 5x5 delay network
+(50 delay/feedback lines from Verbity) with nonlinear feedback, "input
+attack" driving the tail, undersampling with interpolation, plus a full
+tone-shaping section (3-band shelves EQ, lowpass, highpass) sized for
+making anything from tiny rooms to enormous baths. It does not have a
+conventional decay algorithm - the relationships between Decay, Room,
+Dampen and Attack is where the character lives. This RNBO port keeps the
+whole 50-cross-feedback nonlinear network and enlarges the RAM so the
+source's overlapping memory bug (right amount of 8% extra length) is
+REPAIRED rather than emulated (README note). RAM is 160000 doubles.
+
+Parameters (original names):
+
+- slider1 (Room Size) % 0..100, default 60
+  Overall sense of space. Roughly correlates with how much delay line
+  depth the network grows; bigger = more "smear", smaller = drier,
+  closer, more slap. The relationship between Room Size and Decay is
+  the main character dial here, not an absolute cubic meter readout.
+
+- slider2 (Decay) % 0..100, default 50
+  How the tail energy decays: lower = early-energy only / dead,
+  mid-values = musical room tail, 80+ = long washes suitable to things
+  like drums and pads. Because it interacts with Dampen and Room Size,
+  two identical Decay values with different Dampen sound completely
+  different - always compare against yourself by ear.
+
+- slider3 (Dampen) % 0..100, default 40
+  HF absorption in the network: 0 = bright metallic (think genre
+  film "hall" cliches), 40-60 = natural air, 80+ = classic dark
+  diffusion giving that drum-room "thick" about. Uses the source's
+  damping with random (not REAPER) RNG - see README.
+
+- slider4 (Pre-Delay) (ms) 0..100, default 30
+  Classic pre-delay. The source keeps a 4800-sample ceiling, giving
+  roughly 105 ms at 44.1 kHz. Remember: in the port, changes clear the
+  pre-delay buffers (README note), so expect a small click-free swell
+  when you move it.
+
+- slider5 (Input Attack) % 0..100, default 90
+  How the tail "swells up" under real program material. High values =
+  the verb is fed from the start (lively, attack-heavy input), low
+  values = the river washes in with a slower, "breathing" onset. This
+  is the signature Chmahastic control: 80-100 for punchy drums, 0-30
+  for pad/tape-like builds.
+
+- slider6 (Low-Pass Frequency) (kHz) 1..20, default 8
+  A straight lowpass on the wet. The default 8 kHz is generally a
+  "hi-fi hall" sound; 4-6 kHz for darker/behind vocal tracks; 20 kHz
+  starts to get crisp/hissy bright.
+
+- slider7 / slider8 (Hi-Mid Gain dBad / Frequency) -9..+6 dB /
+  1000..8000 Hz, defaults 0 dB / 3500 Hz
+  A bell/shelf-ish emphasis on the high-mids of the wet (clarity of
+  the tail). +2..+3 dB at 2-4 kHz is the "audibility" move; pushing
+  high makes cymbal-verb fizzle.
+
+- slider9 / slider10 (Mid Gain / Frequency) -9..+6 dB /
+  300..5000 Hz, defaults 0 dB / 1000 Hz
+  The body of the tail: 1000 Hz is a good "mid-body" ref. Negative here
+  sinks the reverb behind the mix without getting muddy.
+
+- slider11 / slider12 (Lo-Mid Gain / Frequency) -9..+6 dB /
+  150..2000 Hz, defaults 0 dB / 200 Hz
+  Weight of the low end of the tail: negative values keep a big
+  "airy" hall from crowding the kick; positive values are for
+  super-large "cathedral" grows.
+
+- slider13 (High-Pass Frequency) (Hz) 50..1000, default 50
+  Highpass of the wet (bass trap). 50 Hz default = essentially full
+  bass; 100-300 Hz is where pro mix engineers set their big verb
+  returns so they don't arc-weld the low end.
+
+- slider14 (Stereo Width) % -150..+150, default 120
+  Negative values = narrower / mono-ish (and inverted at extreme
+  negatives), 100 = full stereo, 150 = hyper-wide. Musically 60-120
+  is the working zone; push negative on drum-heavy programs so tails
+  don't drift outside the kick width.
+
+- slider15 (Mix) % 0..100, default 100
+  0..1 wet cross-fade. NOTE: at slider15 = 0 the DRY output still has
+  the source's mix-law attenuation - it is NOT a unity bypass
+  (README note).
+
+- slider16 (Volume) (dB) -30..+9, default 0
+  Straight wet output trim. Use it to compensate the swap between
+  small / large spaces so your return level stays consistent.
+
+Port quirks (README notes): the 50-line cross-feedback and nonlinear
+feedback have been preserved in full; RAM was enlarged to prevent the
+source's memory overlap; damping random uses RNBO random rather than
+REAPER's implementation; the commented-out high-pass variable stays
+zero; and slider15's dry law behaves exactly as in the source (not a
+bypass). Listen after the full tail has developed (several seconds).

@@ -1,0 +1,27 @@
+ClipOnly3 — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/cliponly3/
+
+What it is: a transparent "safety brickwall". It only acts on audio that
+would actually clip: below ±0.90850431 it changes nothing at all, so it is
+safe to leave on any channel or buss. This RNBO port has NO parameters - the
+threshold, soft-clip shape and slew control are fixed in the algorithm.
+
+No parameters:
+
+- (none)
+  Internal behavior, for reference:
+  * soft-clip threshold ±0.9085097 (about -0.84 dBFS), hard overshoot
+    reconstruction to keep clipped tops from sounding "digital"
+  * fixes clipped tops in a very narrow band, not the whole waveform
+  * behaves like a nonlinear lowpass control (based on slew) to tame
+    overs and digital harshness without dulling the material
+  * consumes a small amount of CPU; designed never to be bypassed, you
+    just leave it in the chain
+
+Musical notes: use it where you would otherwise reach for a limiter but
+don't want one - before a saturator or clipper, or on a buss you keep
+relatively unprocessed. It prints a slightly warmer "slide" over any
+overshoots rather than a hard-topped square.
+
+Source quirks (see RNBO/README.md): the port initializes lastDryL/R to 0
+(the source leaves them undefined); behavior otherwise matches the source.

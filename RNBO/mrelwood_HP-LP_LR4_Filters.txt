@@ -1,0 +1,1219 @@
+/* mrelwood_HP-LP_LR4_Filters — RNBO codebox~ port of mrelwood source.
+ * Stereo in1/in2 -> out1/out2; original slider units and defaults.
+ * Graphics and GUI meters omitted. See RNBO/README.md and VALIDATION.md.
+ * //
+ * // NO WARRANTY IS GRANTED. THIS PLUG-IN IS PROVIDED ON AN "AS IS" BASIS, WITHOUT
+ * // WARRANTY OF ANY KIND. NO LIABILITY IS GRANTED, INCLUDING, BUT NOT LIMITED TO,
+ * // ANY DIRECT OR INDIRECT,  SPECIAL,  INCIDENTAL OR CONSEQUENTIAL DAMAGE ARISING
+ * // OUT OF  THE  USE  OR INABILITY  TO  USE  THIS PLUG-IN,  COMPUTER FAILTURE  OF
+ * // MALFUNCTION INCLUDED.  THE USE OF THE SOURCE CODE,  EITHER  PARTIALLY  OR  IN
+ * // TOTAL, IS ONLY GRANTED,  IF USED IN THE SENSE OF THE AUTHOR'S INTENTION,  AND
+ * // USED WITH ACKNOWLEDGEMENT OF THE AUTHOR. FURTHERMORE IS THIS PLUG-IN A  THIRD
+ * // PARTY CONTRIBUTION,  EVEN IF INCLUDED IN REAPER(TM),  COCKOS INCORPORATED  OR
+ * // ITS AFFILIATES HAVE NOTHING TO DO WITH IT.  LAST BUT NOT LEAST, BY USING THIS
+ * // PLUG-IN YOU RELINQUISH YOUR CLAIM TO SUE IT'S AUTHOR, AS WELL AS THE CLAIM TO
+ * // ENTRUST SOMEBODY ELSE WITH DOING SO.
+ * // 
+ * // Released under GPL:
+ * // <http://www.gnu.org/licenses/>.
+ * //
+ * // ******************************************************************************
+ * // butterworth filter implementation - 
+ * // original port from apple.com au tutorial (c+)
+ * // added HP version
+ * // added 12 poles cascade
+ * // * see note below about efficiency
+ * // ******************************************************************************
+ * 
+ * desc: HP/LP LR4 Filters  [mrelwood]
+ * //tags: filter
+ * //author: mrelwood plugins
+ * 
+ * 
+ */
+// Poles
+@param({ min: 0, max: 5 }) slider2 = 1;
+// -Frequency (Scale)
+@param({ min: 0, max: 1 }) slider3 = .5;
+// -Resonance (dB)
+@param({ min: -6, max: 6 }) slider4 = 0;
+// -LP Polarity
+@param({ min: 0, max: 1 }) slider5 = 0;
+// -HP Polarity
+@param({ min: 0, max: 1 }) slider6 = 0;
+// -Mode
+@param({ min: 0, max: 3 }) slider8 = 0;
+// -Output (dB)
+@param({ min: -24, max: 24 }) slider20 = 0;
+@state s_initialized = 0;
+@state frame: Int = 0;
+@state prepared = 0;
+@state s_Q = 0;
+@state s__tmp = 0;
+@state s_ext_tail_size = 0;
+@state s_freq = 0;
+@state s_hpL = 0;
+@state s_hpR = 0;
+@state s_hp_L1_hp0 = 0;
+@state s_hp_L1_hp1 = 0;
+@state s_hp_L1_hp2 = 0;
+@state s_hp_L1_lp0 = 0;
+@state s_hp_L1_lp1 = 0;
+@state s_hp_L1_lp2 = 0;
+@state s_hp_L1_out = 0;
+@state s_hp_L2_hp0 = 0;
+@state s_hp_L2_hp1 = 0;
+@state s_hp_L2_hp2 = 0;
+@state s_hp_L2_lp0 = 0;
+@state s_hp_L2_lp1 = 0;
+@state s_hp_L2_lp2 = 0;
+@state s_hp_L2_out = 0;
+@state s_hp_L3_hp0 = 0;
+@state s_hp_L3_hp1 = 0;
+@state s_hp_L3_hp2 = 0;
+@state s_hp_L3_lp0 = 0;
+@state s_hp_L3_lp1 = 0;
+@state s_hp_L3_lp2 = 0;
+@state s_hp_L3_out = 0;
+@state s_hp_L4_hp0 = 0;
+@state s_hp_L4_hp1 = 0;
+@state s_hp_L4_hp2 = 0;
+@state s_hp_L4_lp0 = 0;
+@state s_hp_L4_lp1 = 0;
+@state s_hp_L4_lp2 = 0;
+@state s_hp_L4_out = 0;
+@state s_hp_L5_hp0 = 0;
+@state s_hp_L5_hp1 = 0;
+@state s_hp_L5_hp2 = 0;
+@state s_hp_L5_lp0 = 0;
+@state s_hp_L5_lp1 = 0;
+@state s_hp_L5_lp2 = 0;
+@state s_hp_L5_out = 0;
+@state s_hp_L6_hp0 = 0;
+@state s_hp_L6_hp1 = 0;
+@state s_hp_L6_hp2 = 0;
+@state s_hp_L6_lp0 = 0;
+@state s_hp_L6_lp1 = 0;
+@state s_hp_L6_lp2 = 0;
+@state s_hp_L6_out = 0;
+@state s_hp_L7_hp0 = 0;
+@state s_hp_L7_hp1 = 0;
+@state s_hp_L7_hp2 = 0;
+@state s_hp_L7_lp0 = 0;
+@state s_hp_L7_lp1 = 0;
+@state s_hp_L7_lp2 = 0;
+@state s_hp_L7_out = 0;
+@state s_hp_R1_hp0 = 0;
+@state s_hp_R1_hp1 = 0;
+@state s_hp_R1_hp2 = 0;
+@state s_hp_R1_lp0 = 0;
+@state s_hp_R1_lp1 = 0;
+@state s_hp_R1_lp2 = 0;
+@state s_hp_R1_out = 0;
+@state s_hp_R2_hp0 = 0;
+@state s_hp_R2_hp1 = 0;
+@state s_hp_R2_hp2 = 0;
+@state s_hp_R2_lp0 = 0;
+@state s_hp_R2_lp1 = 0;
+@state s_hp_R2_lp2 = 0;
+@state s_hp_R2_out = 0;
+@state s_hp_R3_hp0 = 0;
+@state s_hp_R3_hp1 = 0;
+@state s_hp_R3_hp2 = 0;
+@state s_hp_R3_lp0 = 0;
+@state s_hp_R3_lp1 = 0;
+@state s_hp_R3_lp2 = 0;
+@state s_hp_R3_out = 0;
+@state s_hp_R4_hp0 = 0;
+@state s_hp_R4_hp1 = 0;
+@state s_hp_R4_hp2 = 0;
+@state s_hp_R4_lp0 = 0;
+@state s_hp_R4_lp1 = 0;
+@state s_hp_R4_lp2 = 0;
+@state s_hp_R4_out = 0;
+@state s_hp_R5_hp0 = 0;
+@state s_hp_R5_hp1 = 0;
+@state s_hp_R5_hp2 = 0;
+@state s_hp_R5_lp0 = 0;
+@state s_hp_R5_lp1 = 0;
+@state s_hp_R5_lp2 = 0;
+@state s_hp_R5_out = 0;
+@state s_hp_R6_hp0 = 0;
+@state s_hp_R6_hp1 = 0;
+@state s_hp_R6_hp2 = 0;
+@state s_hp_R6_lp0 = 0;
+@state s_hp_R6_lp1 = 0;
+@state s_hp_R6_lp2 = 0;
+@state s_hp_R6_out = 0;
+@state s_hp_R7_hp0 = 0;
+@state s_hp_R7_hp1 = 0;
+@state s_hp_R7_hp2 = 0;
+@state s_hp_R7_lp0 = 0;
+@state s_hp_R7_lp1 = 0;
+@state s_hp_R7_lp2 = 0;
+@state s_hp_R7_out = 0;
+@state s_hp_a0_hp = 0;
+@state s_hp_a0_lp = 0;
+@state s_hp_a1_hp = 0;
+@state s_hp_a1_lp = 0;
+@state s_hp_a2_hp = 0;
+@state s_hp_a2_lp = 0;
+@state s_hp_alpha = 0;
+@state s_hp_b0_hp = 0;
+@state s_hp_b0_lp = 0;
+@state s_hp_b1_hp = 0;
+@state s_hp_b1_lp = 0;
+@state s_hp_b2_hp = 0;
+@state s_hp_b2_lp = 0;
+@state s_hp_cosw = 0;
+@state s_hp_lphp = 0;
+@state s_hp_sinw = 0;
+@state s_hp_w0 = 0;
+@state s_hpena = 0;
+@state s_hppol = 0;
+@state s_lpL = 0;
+@state s_lpR = 0;
+@state s_lp_L1_hp0 = 0;
+@state s_lp_L1_hp1 = 0;
+@state s_lp_L1_hp2 = 0;
+@state s_lp_L1_lp0 = 0;
+@state s_lp_L1_lp1 = 0;
+@state s_lp_L1_lp2 = 0;
+@state s_lp_L1_out = 0;
+@state s_lp_L2_hp0 = 0;
+@state s_lp_L2_hp1 = 0;
+@state s_lp_L2_hp2 = 0;
+@state s_lp_L2_lp0 = 0;
+@state s_lp_L2_lp1 = 0;
+@state s_lp_L2_lp2 = 0;
+@state s_lp_L2_out = 0;
+@state s_lp_L3_hp0 = 0;
+@state s_lp_L3_hp1 = 0;
+@state s_lp_L3_hp2 = 0;
+@state s_lp_L3_lp0 = 0;
+@state s_lp_L3_lp1 = 0;
+@state s_lp_L3_lp2 = 0;
+@state s_lp_L3_out = 0;
+@state s_lp_L4_hp0 = 0;
+@state s_lp_L4_hp1 = 0;
+@state s_lp_L4_hp2 = 0;
+@state s_lp_L4_lp0 = 0;
+@state s_lp_L4_lp1 = 0;
+@state s_lp_L4_lp2 = 0;
+@state s_lp_L4_out = 0;
+@state s_lp_L5_hp0 = 0;
+@state s_lp_L5_hp1 = 0;
+@state s_lp_L5_hp2 = 0;
+@state s_lp_L5_lp0 = 0;
+@state s_lp_L5_lp1 = 0;
+@state s_lp_L5_lp2 = 0;
+@state s_lp_L5_out = 0;
+@state s_lp_L6_hp0 = 0;
+@state s_lp_L6_hp1 = 0;
+@state s_lp_L6_hp2 = 0;
+@state s_lp_L6_lp0 = 0;
+@state s_lp_L6_lp1 = 0;
+@state s_lp_L6_lp2 = 0;
+@state s_lp_L6_out = 0;
+@state s_lp_L7_hp0 = 0;
+@state s_lp_L7_hp1 = 0;
+@state s_lp_L7_hp2 = 0;
+@state s_lp_L7_lp0 = 0;
+@state s_lp_L7_lp1 = 0;
+@state s_lp_L7_lp2 = 0;
+@state s_lp_L7_out = 0;
+@state s_lp_R1_hp0 = 0;
+@state s_lp_R1_hp1 = 0;
+@state s_lp_R1_hp2 = 0;
+@state s_lp_R1_lp0 = 0;
+@state s_lp_R1_lp1 = 0;
+@state s_lp_R1_lp2 = 0;
+@state s_lp_R1_out = 0;
+@state s_lp_R2_hp0 = 0;
+@state s_lp_R2_hp1 = 0;
+@state s_lp_R2_hp2 = 0;
+@state s_lp_R2_lp0 = 0;
+@state s_lp_R2_lp1 = 0;
+@state s_lp_R2_lp2 = 0;
+@state s_lp_R2_out = 0;
+@state s_lp_R3_hp0 = 0;
+@state s_lp_R3_hp1 = 0;
+@state s_lp_R3_hp2 = 0;
+@state s_lp_R3_lp0 = 0;
+@state s_lp_R3_lp1 = 0;
+@state s_lp_R3_lp2 = 0;
+@state s_lp_R3_out = 0;
+@state s_lp_R4_hp0 = 0;
+@state s_lp_R4_hp1 = 0;
+@state s_lp_R4_hp2 = 0;
+@state s_lp_R4_lp0 = 0;
+@state s_lp_R4_lp1 = 0;
+@state s_lp_R4_lp2 = 0;
+@state s_lp_R4_out = 0;
+@state s_lp_R5_hp0 = 0;
+@state s_lp_R5_hp1 = 0;
+@state s_lp_R5_hp2 = 0;
+@state s_lp_R5_lp0 = 0;
+@state s_lp_R5_lp1 = 0;
+@state s_lp_R5_lp2 = 0;
+@state s_lp_R5_out = 0;
+@state s_lp_R6_hp0 = 0;
+@state s_lp_R6_hp1 = 0;
+@state s_lp_R6_hp2 = 0;
+@state s_lp_R6_lp0 = 0;
+@state s_lp_R6_lp1 = 0;
+@state s_lp_R6_lp2 = 0;
+@state s_lp_R6_out = 0;
+@state s_lp_R7_hp0 = 0;
+@state s_lp_R7_hp1 = 0;
+@state s_lp_R7_hp2 = 0;
+@state s_lp_R7_lp0 = 0;
+@state s_lp_R7_lp1 = 0;
+@state s_lp_R7_lp2 = 0;
+@state s_lp_R7_out = 0;
+@state s_lp_a0_hp = 0;
+@state s_lp_a0_lp = 0;
+@state s_lp_a1_hp = 0;
+@state s_lp_a1_lp = 0;
+@state s_lp_a2_hp = 0;
+@state s_lp_a2_lp = 0;
+@state s_lp_alpha = 0;
+@state s_lp_b0_hp = 0;
+@state s_lp_b0_lp = 0;
+@state s_lp_b1_hp = 0;
+@state s_lp_b1_lp = 0;
+@state s_lp_b2_hp = 0;
+@state s_lp_b2_lp = 0;
+@state s_lp_cosw = 0;
+@state s_lp_lphp = 0;
+@state s_lp_sinw = 0;
+@state s_lp_w0 = 0;
+@state s_lpena = 0;
+@state s_lpfmul = 0;
+@state s_lppol = 0;
+@state s_mode = 0;
+@state s_poles = 0;
+@state s_reso = 0;
+@state s_spl0 = 0;
+@state s_spl1 = 0;
+@state s_spl2 = 0;
+@state s_spl3 = 0;
+@state s_vol = 0;
+@state s_xover = 0;
+// EEL division by zero returns zero; RNBO arithmetic does not.
+function eelDivide(a,b) { return b == 0 ? 0 : a/b; }
+function fn__upsli() {
+s_poles = (slider2 + 1);
+let tmp3 = 0;
+if (slider3 < .5) {
+s_freq = pow(10,(1.3 + (slider3 * 3.4)));
+tmp3 = s_freq;
+} else {
+let tmp1 = 0;
+let tmp2 = (slider3 - .5);
+s_freq = pow(10,(3 + (maximum(tmp1, tmp2) * 2.62)));
+tmp3 = s_freq;
+}
+let tmp4 = 20;
+let tmp5 = 20000;
+let tmp6 = s_freq;
+let tmp7 = minimum(tmp5, tmp6);
+s_freq = maximum(tmp4, tmp7);
+s_lpfmul = 1;
+s_reso = slider4;
+s_lppol = (1 - (slider5 * 2));
+s_hppol = (1 - (slider6 * 2));
+s_mode = slider8;
+let tmp17 = 0;
+if (s_poles == 1) {
+let tmp8 = 0;
+if (s_mode == 3) {
+s_hppol *= (0 - 1);
+tmp8 = s_hppol;
+} else {
+tmp8 = 0;
+}
+let tmp9 = 0;
+if (s_reso > 0) {
+s_reso *= 2;
+tmp9 = s_reso;
+} else {
+tmp9 = 0;
+}
+s_reso -= 6;
+tmp17 = s_reso;
+} else {
+let tmp16 = 0;
+if (s_poles == 2) {
+s_reso -= 3;
+tmp16 = s_reso;
+} else {
+let tmp15 = 0;
+if (s_poles == 3) {
+s_lpfmul = 1.24;
+let tmp10 = 0;
+if (s_mode == 3) {
+s_hppol *= (0 - 1);
+tmp10 = s_hppol;
+} else {
+tmp10 = 0;
+}
+let tmp11 = 0;
+if (s_reso > 0) {
+s_reso *= .6;
+tmp11 = s_reso;
+} else {
+tmp11 = 0;
+}
+s_reso -= 2.8;
+tmp15 = s_reso;
+} else {
+let tmp14 = 0;
+if (s_poles == 4) {
+s_lpfmul = 1.45;
+let tmp12 = 0;
+if (s_mode == 3) {
+s_hppol *= (0 - 1);
+tmp12 = s_hppol;
+} else {
+tmp12 = 0;
+}
+let tmp13 = 0;
+if (s_reso > 0) {
+s_reso *= .4;
+tmp13 = s_reso;
+} else {
+tmp13 = 0;
+}
+s_reso -= 2.9;
+tmp14 = s_reso;
+} else {
+tmp14 = 0;
+}
+tmp15 = tmp14;
+}
+tmp16 = tmp15;
+}
+tmp17 = tmp16;
+}
+s_vol = pow(2,eelDivide(slider20,6));
+let tmp20 = 0;
+if (s_mode == 1) {
+s_lpena = 1;
+s_xover = 0;
+s_hpena = s_xover;
+tmp20 = s_hpena;
+} else {
+let tmp19 = 0;
+if (s_mode == 2) {
+s_hpena = 1;
+s_xover = 0;
+s_lpena = s_xover;
+tmp19 = s_lpena;
+} else {
+let tmp18 = 0;
+if (s_mode == 3) {
+s_xover = 1;
+s_lpena = s_xover;
+s_hpena = s_lpena;
+tmp18 = s_hpena;
+} else {
+s_xover = 0;
+s_lpena = s_xover;
+s_hpena = s_lpena;
+tmp18 = s_hpena;
+}
+tmp19 = tmp18;
+}
+tmp20 = tmp19;
+}
+let tmp21 = (0 - 12);
+let tmp22 = 12;
+let tmp23 = s_reso;
+let tmp24 = minimum(tmp22, tmp23);
+s_Q = pow(2,eelDivide(maximum(tmp21, tmp24),6));
+let tmp31 = 0;
+if (s_lpena) {
+let tmp25 = 0;
+let tmp26 = (s_freq * s_lpfmul);
+let tmp27 = s_Q;
+tmp31 = fn_lp_LR4ini(tmp25, tmp26, tmp27);
+} else {
+tmp31 = 0;
+}
+let tmp38 = 0;
+if (s_hpena) {
+let tmp32 = 1;
+let tmp33 = eelDivide(s_freq,s_lpfmul);
+let tmp34 = s_Q;
+tmp38 = fn_hp_LR4ini(tmp32, tmp33, tmp34);
+} else {
+tmp38 = 0;
+}
+return tmp38;
+}
+
+function fn_lp_LR4ini(arg_lphp, arg_freq, arg_Q) {
+s_lp_lphp = arg_lphp;
+s_lp_w0 = eelDivide(((2 * PI) * arg_freq),samplerate());
+let tmp28 = s_lp_w0;
+s_lp_cosw = cos(tmp28);
+let tmp29 = s_lp_w0;
+s_lp_sinw = sin(tmp29);
+s_lp_alpha = eelDivide(s_lp_sinw,(2 * arg_Q));
+let tmp30 = 0;
+if (arg_lphp == 0) {
+s_lp_b0_lp = eelDivide((1 - s_lp_cosw),2);
+s_lp_b1_lp = (1 - s_lp_cosw);
+s_lp_b2_lp = eelDivide((1 - s_lp_cosw),2);
+s_lp_a0_lp = (1 + s_lp_alpha);
+s_lp_a1_lp = ((0 - 2) * s_lp_cosw);
+s_lp_a2_lp = (1 - s_lp_alpha);
+s_lp_b0_lp /= s_lp_a0_lp;
+s_lp_b1_lp /= s_lp_a0_lp;
+s_lp_b2_lp /= s_lp_a0_lp;
+s_lp_a1_lp /= s_lp_a0_lp;
+s_lp_a2_lp /= s_lp_a0_lp;
+tmp30 = s_lp_a2_lp;
+} else {
+s_lp_b0_hp = eelDivide((1 + s_lp_cosw),2);
+s_lp_b1_hp = (0 - (1 + s_lp_cosw));
+s_lp_b2_hp = eelDivide((1 + s_lp_cosw),2);
+s_lp_a0_hp = (1 + s_lp_alpha);
+s_lp_a1_hp = ((0 - 2) * s_lp_cosw);
+s_lp_a2_hp = (1 - s_lp_alpha);
+s_lp_b0_hp /= s_lp_a0_hp;
+s_lp_b1_hp /= s_lp_a0_hp;
+s_lp_b2_hp /= s_lp_a0_hp;
+s_lp_a1_hp /= s_lp_a0_hp;
+s_lp_a2_hp /= s_lp_a0_hp;
+tmp30 = s_lp_a2_hp;
+}
+return tmp30;
+}
+
+function fn_hp_LR4ini(arg_lphp, arg_freq, arg_Q) {
+s_hp_lphp = arg_lphp;
+s_hp_w0 = eelDivide(((2 * PI) * arg_freq),samplerate());
+let tmp35 = s_hp_w0;
+s_hp_cosw = cos(tmp35);
+let tmp36 = s_hp_w0;
+s_hp_sinw = sin(tmp36);
+s_hp_alpha = eelDivide(s_hp_sinw,(2 * arg_Q));
+let tmp37 = 0;
+if (arg_lphp == 0) {
+s_hp_b0_lp = eelDivide((1 - s_hp_cosw),2);
+s_hp_b1_lp = (1 - s_hp_cosw);
+s_hp_b2_lp = eelDivide((1 - s_hp_cosw),2);
+s_hp_a0_lp = (1 + s_hp_alpha);
+s_hp_a1_lp = ((0 - 2) * s_hp_cosw);
+s_hp_a2_lp = (1 - s_hp_alpha);
+s_hp_b0_lp /= s_hp_a0_lp;
+s_hp_b1_lp /= s_hp_a0_lp;
+s_hp_b2_lp /= s_hp_a0_lp;
+s_hp_a1_lp /= s_hp_a0_lp;
+s_hp_a2_lp /= s_hp_a0_lp;
+tmp37 = s_hp_a2_lp;
+} else {
+s_hp_b0_hp = eelDivide((1 + s_hp_cosw),2);
+s_hp_b1_hp = (0 - (1 + s_hp_cosw));
+s_hp_b2_hp = eelDivide((1 + s_hp_cosw),2);
+s_hp_a0_hp = (1 + s_hp_alpha);
+s_hp_a1_hp = ((0 - 2) * s_hp_cosw);
+s_hp_a2_hp = (1 - s_hp_alpha);
+s_hp_b0_hp /= s_hp_a0_hp;
+s_hp_b1_hp /= s_hp_a0_hp;
+s_hp_b2_hp /= s_hp_a0_hp;
+s_hp_a1_hp /= s_hp_a0_hp;
+s_hp_a2_hp /= s_hp_a0_hp;
+tmp37 = s_hp_a2_hp;
+}
+return tmp37;
+}
+
+function fn_hp_L1_LR2(arg_in) {
+let tmp40 = 0;
+if (s_hp_lphp == 0) {
+s_hp_L1_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_L1_lp1);
+s_hp_L1_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_L1_lp0)) + s_hp_L1_lp2);
+s_hp_L1_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_L1_lp0));
+s_hp_L1_out = s_hp_L1_lp0;
+tmp40 = s_hp_L1_out;
+} else {
+s_hp_L1_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_L1_hp1);
+s_hp_L1_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_L1_hp0)) + s_hp_L1_hp2);
+s_hp_L1_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_L1_hp0));
+s_hp_L1_out = s_hp_L1_hp0;
+tmp40 = s_hp_L1_out;
+}
+return s_hp_L1_out;
+}
+
+function fn_hp_R1_LR2(arg_in) {
+let tmp42 = 0;
+if (s_hp_lphp == 0) {
+s_hp_R1_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_R1_lp1);
+s_hp_R1_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_R1_lp0)) + s_hp_R1_lp2);
+s_hp_R1_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_R1_lp0));
+s_hp_R1_out = s_hp_R1_lp0;
+tmp42 = s_hp_R1_out;
+} else {
+s_hp_R1_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_R1_hp1);
+s_hp_R1_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_R1_hp0)) + s_hp_R1_hp2);
+s_hp_R1_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_R1_hp0));
+s_hp_R1_out = s_hp_R1_hp0;
+tmp42 = s_hp_R1_out;
+}
+return s_hp_R1_out;
+}
+
+function fn_hp_L2_LR2(arg_in) {
+let tmp44 = 0;
+if (s_hp_lphp == 0) {
+s_hp_L2_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_L2_lp1);
+s_hp_L2_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_L2_lp0)) + s_hp_L2_lp2);
+s_hp_L2_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_L2_lp0));
+s_hp_L2_out = s_hp_L2_lp0;
+tmp44 = s_hp_L2_out;
+} else {
+s_hp_L2_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_L2_hp1);
+s_hp_L2_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_L2_hp0)) + s_hp_L2_hp2);
+s_hp_L2_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_L2_hp0));
+s_hp_L2_out = s_hp_L2_hp0;
+tmp44 = s_hp_L2_out;
+}
+return s_hp_L2_out;
+}
+
+function fn_hp_R2_LR2(arg_in) {
+let tmp46 = 0;
+if (s_hp_lphp == 0) {
+s_hp_R2_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_R2_lp1);
+s_hp_R2_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_R2_lp0)) + s_hp_R2_lp2);
+s_hp_R2_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_R2_lp0));
+s_hp_R2_out = s_hp_R2_lp0;
+tmp46 = s_hp_R2_out;
+} else {
+s_hp_R2_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_R2_hp1);
+s_hp_R2_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_R2_hp0)) + s_hp_R2_hp2);
+s_hp_R2_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_R2_hp0));
+s_hp_R2_out = s_hp_R2_hp0;
+tmp46 = s_hp_R2_out;
+}
+return s_hp_R2_out;
+}
+
+function fn_hp_L3_LR2(arg_in) {
+let tmp49 = 0;
+if (s_hp_lphp == 0) {
+s_hp_L3_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_L3_lp1);
+s_hp_L3_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_L3_lp0)) + s_hp_L3_lp2);
+s_hp_L3_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_L3_lp0));
+s_hp_L3_out = s_hp_L3_lp0;
+tmp49 = s_hp_L3_out;
+} else {
+s_hp_L3_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_L3_hp1);
+s_hp_L3_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_L3_hp0)) + s_hp_L3_hp2);
+s_hp_L3_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_L3_hp0));
+s_hp_L3_out = s_hp_L3_hp0;
+tmp49 = s_hp_L3_out;
+}
+return s_hp_L3_out;
+}
+
+function fn_hp_R3_LR2(arg_in) {
+let tmp51 = 0;
+if (s_hp_lphp == 0) {
+s_hp_R3_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_R3_lp1);
+s_hp_R3_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_R3_lp0)) + s_hp_R3_lp2);
+s_hp_R3_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_R3_lp0));
+s_hp_R3_out = s_hp_R3_lp0;
+tmp51 = s_hp_R3_out;
+} else {
+s_hp_R3_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_R3_hp1);
+s_hp_R3_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_R3_hp0)) + s_hp_R3_hp2);
+s_hp_R3_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_R3_hp0));
+s_hp_R3_out = s_hp_R3_hp0;
+tmp51 = s_hp_R3_out;
+}
+return s_hp_R3_out;
+}
+
+function fn_hp_L4_LR2(arg_in) {
+let tmp53 = 0;
+if (s_hp_lphp == 0) {
+s_hp_L4_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_L4_lp1);
+s_hp_L4_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_L4_lp0)) + s_hp_L4_lp2);
+s_hp_L4_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_L4_lp0));
+s_hp_L4_out = s_hp_L4_lp0;
+tmp53 = s_hp_L4_out;
+} else {
+s_hp_L4_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_L4_hp1);
+s_hp_L4_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_L4_hp0)) + s_hp_L4_hp2);
+s_hp_L4_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_L4_hp0));
+s_hp_L4_out = s_hp_L4_hp0;
+tmp53 = s_hp_L4_out;
+}
+return s_hp_L4_out;
+}
+
+function fn_hp_R4_LR2(arg_in) {
+let tmp55 = 0;
+if (s_hp_lphp == 0) {
+s_hp_R4_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_R4_lp1);
+s_hp_R4_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_R4_lp0)) + s_hp_R4_lp2);
+s_hp_R4_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_R4_lp0));
+s_hp_R4_out = s_hp_R4_lp0;
+tmp55 = s_hp_R4_out;
+} else {
+s_hp_R4_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_R4_hp1);
+s_hp_R4_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_R4_hp0)) + s_hp_R4_hp2);
+s_hp_R4_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_R4_hp0));
+s_hp_R4_out = s_hp_R4_hp0;
+tmp55 = s_hp_R4_out;
+}
+return s_hp_R4_out;
+}
+
+function fn_hp_L5_LR2(arg_in) {
+let tmp58 = 0;
+if (s_hp_lphp == 0) {
+s_hp_L5_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_L5_lp1);
+s_hp_L5_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_L5_lp0)) + s_hp_L5_lp2);
+s_hp_L5_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_L5_lp0));
+s_hp_L5_out = s_hp_L5_lp0;
+tmp58 = s_hp_L5_out;
+} else {
+s_hp_L5_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_L5_hp1);
+s_hp_L5_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_L5_hp0)) + s_hp_L5_hp2);
+s_hp_L5_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_L5_hp0));
+s_hp_L5_out = s_hp_L5_hp0;
+tmp58 = s_hp_L5_out;
+}
+return s_hp_L5_out;
+}
+
+function fn_hp_R5_LR2(arg_in) {
+let tmp60 = 0;
+if (s_hp_lphp == 0) {
+s_hp_R5_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_R5_lp1);
+s_hp_R5_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_R5_lp0)) + s_hp_R5_lp2);
+s_hp_R5_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_R5_lp0));
+s_hp_R5_out = s_hp_R5_lp0;
+tmp60 = s_hp_R5_out;
+} else {
+s_hp_R5_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_R5_hp1);
+s_hp_R5_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_R5_hp0)) + s_hp_R5_hp2);
+s_hp_R5_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_R5_hp0));
+s_hp_R5_out = s_hp_R5_hp0;
+tmp60 = s_hp_R5_out;
+}
+return s_hp_R5_out;
+}
+
+function fn_hp_L6_LR2(arg_in) {
+let tmp62 = 0;
+if (s_hp_lphp == 0) {
+s_hp_L6_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_L6_lp1);
+s_hp_L6_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_L6_lp0)) + s_hp_L6_lp2);
+s_hp_L6_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_L6_lp0));
+s_hp_L6_out = s_hp_L6_lp0;
+tmp62 = s_hp_L6_out;
+} else {
+s_hp_L6_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_L6_hp1);
+s_hp_L6_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_L6_hp0)) + s_hp_L6_hp2);
+s_hp_L6_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_L6_hp0));
+s_hp_L6_out = s_hp_L6_hp0;
+tmp62 = s_hp_L6_out;
+}
+return s_hp_L6_out;
+}
+
+function fn_hp_R6_LR2(arg_in) {
+let tmp64 = 0;
+if (s_hp_lphp == 0) {
+s_hp_R6_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_R6_lp1);
+s_hp_R6_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_R6_lp0)) + s_hp_R6_lp2);
+s_hp_R6_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_R6_lp0));
+s_hp_R6_out = s_hp_R6_lp0;
+tmp64 = s_hp_R6_out;
+} else {
+s_hp_R6_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_R6_hp1);
+s_hp_R6_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_R6_hp0)) + s_hp_R6_hp2);
+s_hp_R6_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_R6_hp0));
+s_hp_R6_out = s_hp_R6_hp0;
+tmp64 = s_hp_R6_out;
+}
+return s_hp_R6_out;
+}
+
+function fn_hp_L7_LR2(arg_in) {
+let tmp66 = 0;
+if (s_hp_lphp == 0) {
+s_hp_L7_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_L7_lp1);
+s_hp_L7_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_L7_lp0)) + s_hp_L7_lp2);
+s_hp_L7_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_L7_lp0));
+s_hp_L7_out = s_hp_L7_lp0;
+tmp66 = s_hp_L7_out;
+} else {
+s_hp_L7_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_L7_hp1);
+s_hp_L7_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_L7_hp0)) + s_hp_L7_hp2);
+s_hp_L7_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_L7_hp0));
+s_hp_L7_out = s_hp_L7_hp0;
+tmp66 = s_hp_L7_out;
+}
+return s_hp_L7_out;
+}
+
+function fn_hp_R7_LR2(arg_in) {
+let tmp68 = 0;
+if (s_hp_lphp == 0) {
+s_hp_R7_lp0 = ((s_hp_b0_lp * arg_in) + s_hp_R7_lp1);
+s_hp_R7_lp1 = (((s_hp_b1_lp * arg_in) - (s_hp_a1_lp * s_hp_R7_lp0)) + s_hp_R7_lp2);
+s_hp_R7_lp2 = ((s_hp_b2_lp * arg_in) - (s_hp_a2_lp * s_hp_R7_lp0));
+s_hp_R7_out = s_hp_R7_lp0;
+tmp68 = s_hp_R7_out;
+} else {
+s_hp_R7_hp0 = ((s_hp_b0_hp * arg_in) + s_hp_R7_hp1);
+s_hp_R7_hp1 = (((s_hp_b1_hp * arg_in) - (s_hp_a1_hp * s_hp_R7_hp0)) + s_hp_R7_hp2);
+s_hp_R7_hp2 = ((s_hp_b2_hp * arg_in) - (s_hp_a2_hp * s_hp_R7_hp0));
+s_hp_R7_out = s_hp_R7_hp0;
+tmp68 = s_hp_R7_out;
+}
+return s_hp_R7_out;
+}
+
+function fn_lp_L1_LR2(arg_in) {
+let tmp72 = 0;
+if (s_lp_lphp == 0) {
+s_lp_L1_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_L1_lp1);
+s_lp_L1_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_L1_lp0)) + s_lp_L1_lp2);
+s_lp_L1_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_L1_lp0));
+s_lp_L1_out = s_lp_L1_lp0;
+tmp72 = s_lp_L1_out;
+} else {
+s_lp_L1_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_L1_hp1);
+s_lp_L1_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_L1_hp0)) + s_lp_L1_hp2);
+s_lp_L1_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_L1_hp0));
+s_lp_L1_out = s_lp_L1_hp0;
+tmp72 = s_lp_L1_out;
+}
+return s_lp_L1_out;
+}
+
+function fn_lp_R1_LR2(arg_in) {
+let tmp74 = 0;
+if (s_lp_lphp == 0) {
+s_lp_R1_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_R1_lp1);
+s_lp_R1_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_R1_lp0)) + s_lp_R1_lp2);
+s_lp_R1_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_R1_lp0));
+s_lp_R1_out = s_lp_R1_lp0;
+tmp74 = s_lp_R1_out;
+} else {
+s_lp_R1_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_R1_hp1);
+s_lp_R1_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_R1_hp0)) + s_lp_R1_hp2);
+s_lp_R1_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_R1_hp0));
+s_lp_R1_out = s_lp_R1_hp0;
+tmp74 = s_lp_R1_out;
+}
+return s_lp_R1_out;
+}
+
+function fn_lp_L2_LR2(arg_in) {
+let tmp76 = 0;
+if (s_lp_lphp == 0) {
+s_lp_L2_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_L2_lp1);
+s_lp_L2_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_L2_lp0)) + s_lp_L2_lp2);
+s_lp_L2_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_L2_lp0));
+s_lp_L2_out = s_lp_L2_lp0;
+tmp76 = s_lp_L2_out;
+} else {
+s_lp_L2_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_L2_hp1);
+s_lp_L2_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_L2_hp0)) + s_lp_L2_hp2);
+s_lp_L2_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_L2_hp0));
+s_lp_L2_out = s_lp_L2_hp0;
+tmp76 = s_lp_L2_out;
+}
+return s_lp_L2_out;
+}
+
+function fn_lp_R2_LR2(arg_in) {
+let tmp78 = 0;
+if (s_lp_lphp == 0) {
+s_lp_R2_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_R2_lp1);
+s_lp_R2_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_R2_lp0)) + s_lp_R2_lp2);
+s_lp_R2_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_R2_lp0));
+s_lp_R2_out = s_lp_R2_lp0;
+tmp78 = s_lp_R2_out;
+} else {
+s_lp_R2_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_R2_hp1);
+s_lp_R2_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_R2_hp0)) + s_lp_R2_hp2);
+s_lp_R2_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_R2_hp0));
+s_lp_R2_out = s_lp_R2_hp0;
+tmp78 = s_lp_R2_out;
+}
+return s_lp_R2_out;
+}
+
+function fn_lp_L3_LR2(arg_in) {
+let tmp81 = 0;
+if (s_lp_lphp == 0) {
+s_lp_L3_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_L3_lp1);
+s_lp_L3_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_L3_lp0)) + s_lp_L3_lp2);
+s_lp_L3_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_L3_lp0));
+s_lp_L3_out = s_lp_L3_lp0;
+tmp81 = s_lp_L3_out;
+} else {
+s_lp_L3_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_L3_hp1);
+s_lp_L3_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_L3_hp0)) + s_lp_L3_hp2);
+s_lp_L3_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_L3_hp0));
+s_lp_L3_out = s_lp_L3_hp0;
+tmp81 = s_lp_L3_out;
+}
+return s_lp_L3_out;
+}
+
+function fn_lp_R3_LR2(arg_in) {
+let tmp83 = 0;
+if (s_lp_lphp == 0) {
+s_lp_R3_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_R3_lp1);
+s_lp_R3_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_R3_lp0)) + s_lp_R3_lp2);
+s_lp_R3_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_R3_lp0));
+s_lp_R3_out = s_lp_R3_lp0;
+tmp83 = s_lp_R3_out;
+} else {
+s_lp_R3_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_R3_hp1);
+s_lp_R3_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_R3_hp0)) + s_lp_R3_hp2);
+s_lp_R3_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_R3_hp0));
+s_lp_R3_out = s_lp_R3_hp0;
+tmp83 = s_lp_R3_out;
+}
+return s_lp_R3_out;
+}
+
+function fn_lp_L4_LR2(arg_in) {
+let tmp85 = 0;
+if (s_lp_lphp == 0) {
+s_lp_L4_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_L4_lp1);
+s_lp_L4_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_L4_lp0)) + s_lp_L4_lp2);
+s_lp_L4_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_L4_lp0));
+s_lp_L4_out = s_lp_L4_lp0;
+tmp85 = s_lp_L4_out;
+} else {
+s_lp_L4_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_L4_hp1);
+s_lp_L4_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_L4_hp0)) + s_lp_L4_hp2);
+s_lp_L4_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_L4_hp0));
+s_lp_L4_out = s_lp_L4_hp0;
+tmp85 = s_lp_L4_out;
+}
+return s_lp_L4_out;
+}
+
+function fn_lp_R4_LR2(arg_in) {
+let tmp87 = 0;
+if (s_lp_lphp == 0) {
+s_lp_R4_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_R4_lp1);
+s_lp_R4_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_R4_lp0)) + s_lp_R4_lp2);
+s_lp_R4_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_R4_lp0));
+s_lp_R4_out = s_lp_R4_lp0;
+tmp87 = s_lp_R4_out;
+} else {
+s_lp_R4_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_R4_hp1);
+s_lp_R4_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_R4_hp0)) + s_lp_R4_hp2);
+s_lp_R4_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_R4_hp0));
+s_lp_R4_out = s_lp_R4_hp0;
+tmp87 = s_lp_R4_out;
+}
+return s_lp_R4_out;
+}
+
+function fn_lp_L5_LR2(arg_in) {
+let tmp90 = 0;
+if (s_lp_lphp == 0) {
+s_lp_L5_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_L5_lp1);
+s_lp_L5_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_L5_lp0)) + s_lp_L5_lp2);
+s_lp_L5_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_L5_lp0));
+s_lp_L5_out = s_lp_L5_lp0;
+tmp90 = s_lp_L5_out;
+} else {
+s_lp_L5_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_L5_hp1);
+s_lp_L5_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_L5_hp0)) + s_lp_L5_hp2);
+s_lp_L5_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_L5_hp0));
+s_lp_L5_out = s_lp_L5_hp0;
+tmp90 = s_lp_L5_out;
+}
+return s_lp_L5_out;
+}
+
+function fn_lp_R5_LR2(arg_in) {
+let tmp92 = 0;
+if (s_lp_lphp == 0) {
+s_lp_R5_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_R5_lp1);
+s_lp_R5_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_R5_lp0)) + s_lp_R5_lp2);
+s_lp_R5_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_R5_lp0));
+s_lp_R5_out = s_lp_R5_lp0;
+tmp92 = s_lp_R5_out;
+} else {
+s_lp_R5_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_R5_hp1);
+s_lp_R5_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_R5_hp0)) + s_lp_R5_hp2);
+s_lp_R5_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_R5_hp0));
+s_lp_R5_out = s_lp_R5_hp0;
+tmp92 = s_lp_R5_out;
+}
+return s_lp_R5_out;
+}
+
+function fn_lp_L6_LR2(arg_in) {
+let tmp94 = 0;
+if (s_lp_lphp == 0) {
+s_lp_L6_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_L6_lp1);
+s_lp_L6_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_L6_lp0)) + s_lp_L6_lp2);
+s_lp_L6_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_L6_lp0));
+s_lp_L6_out = s_lp_L6_lp0;
+tmp94 = s_lp_L6_out;
+} else {
+s_lp_L6_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_L6_hp1);
+s_lp_L6_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_L6_hp0)) + s_lp_L6_hp2);
+s_lp_L6_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_L6_hp0));
+s_lp_L6_out = s_lp_L6_hp0;
+tmp94 = s_lp_L6_out;
+}
+return s_lp_L6_out;
+}
+
+function fn_lp_R6_LR2(arg_in) {
+let tmp96 = 0;
+if (s_lp_lphp == 0) {
+s_lp_R6_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_R6_lp1);
+s_lp_R6_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_R6_lp0)) + s_lp_R6_lp2);
+s_lp_R6_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_R6_lp0));
+s_lp_R6_out = s_lp_R6_lp0;
+tmp96 = s_lp_R6_out;
+} else {
+s_lp_R6_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_R6_hp1);
+s_lp_R6_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_R6_hp0)) + s_lp_R6_hp2);
+s_lp_R6_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_R6_hp0));
+s_lp_R6_out = s_lp_R6_hp0;
+tmp96 = s_lp_R6_out;
+}
+return s_lp_R6_out;
+}
+
+function fn_lp_L7_LR2(arg_in) {
+let tmp98 = 0;
+if (s_lp_lphp == 0) {
+s_lp_L7_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_L7_lp1);
+s_lp_L7_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_L7_lp0)) + s_lp_L7_lp2);
+s_lp_L7_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_L7_lp0));
+s_lp_L7_out = s_lp_L7_lp0;
+tmp98 = s_lp_L7_out;
+} else {
+s_lp_L7_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_L7_hp1);
+s_lp_L7_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_L7_hp0)) + s_lp_L7_hp2);
+s_lp_L7_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_L7_hp0));
+s_lp_L7_out = s_lp_L7_hp0;
+tmp98 = s_lp_L7_out;
+}
+return s_lp_L7_out;
+}
+
+function fn_lp_R7_LR2(arg_in) {
+let tmp100 = 0;
+if (s_lp_lphp == 0) {
+s_lp_R7_lp0 = ((s_lp_b0_lp * arg_in) + s_lp_R7_lp1);
+s_lp_R7_lp1 = (((s_lp_b1_lp * arg_in) - (s_lp_a1_lp * s_lp_R7_lp0)) + s_lp_R7_lp2);
+s_lp_R7_lp2 = ((s_lp_b2_lp * arg_in) - (s_lp_a2_lp * s_lp_R7_lp0));
+s_lp_R7_out = s_lp_R7_lp0;
+tmp100 = s_lp_R7_out;
+} else {
+s_lp_R7_hp0 = ((s_lp_b0_hp * arg_in) + s_lp_R7_hp1);
+s_lp_R7_hp1 = (((s_lp_b1_hp * arg_in) - (s_lp_a1_hp * s_lp_R7_hp0)) + s_lp_R7_hp2);
+s_lp_R7_hp2 = ((s_lp_b2_hp * arg_in) - (s_lp_a2_hp * s_lp_R7_hp0));
+s_lp_R7_out = s_lp_R7_hp0;
+tmp100 = s_lp_R7_out;
+}
+return s_lp_R7_out;
+}
+function dspsetup() { frame = 0; prepared = 0; controlsReady = 0; }
+if (prepared == 0) {
+if (prepared == 0 && s_initialized == 0) {
+s_ext_tail_size = (0 - 1);
+
+s_initialized = 1;
+}
+prepared = 1;
+}
+@state previousControls = new FixedFloat64Array(7);
+@state controlsReady = 0;
+if (frame == 0) {
+let changed = controlsReady == 0;
+if (previousControls[0] != slider2) changed = 1;
+previousControls[0] = slider2;
+if (previousControls[1] != slider3) changed = 1;
+previousControls[1] = slider3;
+if (previousControls[2] != slider4) changed = 1;
+previousControls[2] = slider4;
+if (previousControls[3] != slider5) changed = 1;
+previousControls[3] = slider5;
+if (previousControls[4] != slider6) changed = 1;
+previousControls[4] = slider6;
+if (previousControls[5] != slider8) changed = 1;
+previousControls[5] = slider8;
+if (previousControls[6] != slider20) changed = 1;
+previousControls[6] = slider20;
+if (changed) {
+fn__upsli();
+controlsReady = 1;
+}
+
+}
+s_spl0 = in1;
+s_spl1 = in2;
+let tmp70 = 0;
+if (s_hpena) {
+let tmp39 = s_spl0;
+s_hpL = fn_hp_L1_LR2(tmp39);
+let tmp41 = s_spl1;
+s_hpR = fn_hp_R1_LR2(tmp41);
+let tmp47 = 0;
+if (s_poles >= 2) {
+let tmp43 = s_hpL;
+s_hpL = fn_hp_L2_LR2(tmp43);
+let tmp45 = s_hpR;
+s_hpR = fn_hp_R2_LR2(tmp45);
+tmp47 = s_hpR;
+} else {
+tmp47 = 0;
+}
+let tmp56 = 0;
+if (s_poles >= 3) {
+let tmp48 = s_hpL;
+s_hpL = fn_hp_L3_LR2(tmp48);
+let tmp50 = s_hpR;
+s_hpR = fn_hp_R3_LR2(tmp50);
+let tmp52 = s_hpL;
+s_hpL = fn_hp_L4_LR2(tmp52);
+let tmp54 = s_hpR;
+s_hpR = fn_hp_R4_LR2(tmp54);
+tmp56 = s_hpR;
+} else {
+tmp56 = 0;
+}
+let tmp69 = 0;
+if (s_poles == 4) {
+let tmp57 = s_hpL;
+s_hpL = fn_hp_L5_LR2(tmp57);
+let tmp59 = s_hpR;
+s_hpR = fn_hp_R5_LR2(tmp59);
+let tmp61 = s_hpL;
+s_hpL = fn_hp_L6_LR2(tmp61);
+let tmp63 = s_hpR;
+s_hpR = fn_hp_R6_LR2(tmp63);
+let tmp65 = s_hpL;
+s_hpL = fn_hp_L7_LR2(tmp65);
+let tmp67 = s_hpR;
+s_hpR = fn_hp_R7_LR2(tmp67);
+tmp69 = s_hpR;
+} else {
+tmp69 = 0;
+}
+s_hpL *= s_hppol;
+s_hpR *= s_hppol;
+tmp70 = s_hpR;
+} else {
+tmp70 = 0;
+}
+let tmp102 = 0;
+if (s_lpena) {
+let tmp71 = s_spl0;
+s_lpL = fn_lp_L1_LR2(tmp71);
+let tmp73 = s_spl1;
+s_lpR = fn_lp_R1_LR2(tmp73);
+s__tmp = s_lpL;
+let tmp79 = 0;
+if (s_poles >= 2) {
+let tmp75 = s_lpL;
+s_lpL = fn_lp_L2_LR2(tmp75);
+let tmp77 = s_lpR;
+s_lpR = fn_lp_R2_LR2(tmp77);
+tmp79 = s_lpR;
+} else {
+tmp79 = 0;
+}
+let tmp88 = 0;
+if (s_poles >= 3) {
+let tmp80 = s_lpL;
+s_lpL = fn_lp_L3_LR2(tmp80);
+let tmp82 = s_lpR;
+s_lpR = fn_lp_R3_LR2(tmp82);
+let tmp84 = s_lpL;
+s_lpL = fn_lp_L4_LR2(tmp84);
+let tmp86 = s_lpR;
+s_lpR = fn_lp_R4_LR2(tmp86);
+tmp88 = s_lpR;
+} else {
+tmp88 = 0;
+}
+let tmp101 = 0;
+if (s_poles >= 4) {
+let tmp89 = s_lpL;
+s_lpL = fn_lp_L5_LR2(tmp89);
+let tmp91 = s_lpR;
+s_lpR = fn_lp_R5_LR2(tmp91);
+let tmp93 = s_lpL;
+s_lpL = fn_lp_L6_LR2(tmp93);
+let tmp95 = s_lpR;
+s_lpR = fn_lp_R6_LR2(tmp95);
+let tmp97 = s_lpL;
+s_lpL = fn_lp_L7_LR2(tmp97);
+let tmp99 = s_lpR;
+s_lpR = fn_lp_R7_LR2(tmp99);
+tmp101 = s_lpR;
+} else {
+tmp101 = 0;
+}
+s_spl0 = (s_lpL * s_lppol);
+s_spl1 = (s_lpR * s_lppol);
+tmp102 = s_spl1;
+} else {
+tmp102 = 0;
+}
+let tmp104 = 0;
+if (s_xover) {
+s_spl2 = s_hpL;
+s_spl3 = s_hpR;
+tmp104 = s_spl3;
+} else {
+let tmp103 = 0;
+if (s_hpena) {
+s_spl0 = s_hpL;
+s_spl1 = s_hpR;
+tmp103 = s_spl1;
+} else {
+tmp103 = 0;
+}
+tmp104 = tmp103;
+}
+let tmp106 = 0;
+if (((s_mode > 0) && (s_mode <= 3))) {
+s_spl0 *= s_vol;
+s_spl1 *= s_vol;
+let tmp105 = 0;
+if (s_mode == 3) {
+s_spl2 *= s_vol;
+s_spl3 *= s_vol;
+tmp105 = s_spl3;
+} else {
+tmp105 = 0;
+}
+tmp106 = tmp105;
+} else {
+tmp106 = 0;
+}
+
+out1 = s_spl0;
+out2 = s_spl1;
+out3 = s_spl2;
+out4 = s_spl3;
+frame++;
+if (frame >= vectorsize()) frame = 0;

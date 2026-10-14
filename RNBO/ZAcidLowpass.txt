@@ -1,0 +1,234 @@
+/* ZAcidLowpass — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Cutoff
+@param({ min: 0, max: 1 }) p_cutoff = 0.5;
+// VST B: Over
+@param({ min: 0, max: 1 }) p_over = 0.0;
+// VST C: Under
+@param({ min: 0, max: 1 }) p_under = 1.0;
+// VST D: Meltdwn
+@param({ min: 0, max: 1 }) p_meltdwn = 0.0;
+// VST E: Drive
+@param({ min: 0, max: 1 }) p_drive = 0.1;
+// VST F: Output
+@param({ min: 0, max: 1 }) p_output = 1.0;
+
+const bez_AL = 0;
+const bez_AR = 1;
+const bez_BL = 2;
+const bez_BR = 3;
+const bez_CL = 4;
+const bez_CR = 5;
+const bez_DL = 6;
+const bez_DR = 7;
+const bez_SampL = 8;
+const bez_SampR = 9;
+const bez_cycle = 10;
+const bez_total = 11;
+@state bezA = new FixedFloat64Array(bez_total);
+@state biquadE = new FixedFloat64Array(15);
+@state biquadF = new FixedFloat64Array(15);
+@state iirSampleAL = 0;
+@state iirSampleAR = 0;
+@state cutoffA = 0;
+@state cutoffB = 0;
+@state overA = 0;
+@state overB = 0;
+@state underA = 0;
+@state underB = 0;
+@state meltdownA = 0;
+@state meltdownB = 0;
+@state inTrimA = 0;
+@state inTrimB = 0;
+@state outTrimA = 0;
+@state outTrimB = 0;
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state iirAmountA = 0;
+@state K = 0;
+@state norm = 0;
+@state x: Int = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+function init() {
+
+	for (let x: Int = 0; x < bez_total; x++) {bezA[x] = 0.0;}
+	bezA[bez_cycle] = 1.0;
+	for (let x: Int = 0; x < 15; x++) {biquadE[x] = 0.0; biquadF[x] = 0.0;}
+	iirSampleAL = 0.0;
+	iirSampleAR = 0.0;
+
+	cutoffA = 0.5; cutoffB = 0.5;
+	overA = 0.0; overB = 0.0;
+	underA = 1.0; underB = 1.0;
+	meltdownA = 0.0; meltdownB = 0.0;
+	inTrimA = 0.1; inTrimB = 0.1;
+	outTrimA = 1.0; outTrimB = 1.0;	
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 1.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();
+	
+	cutoffA = cutoffB;
+	cutoffB = pow(p_cutoff,3.0)/overallscale;
+	cutoffB /= (2.0/pow(overallscale,0.5-((overallscale-1.0)*0.0375)));
+	if (cutoffB < 0.0001) cutoffB = 0.0001; if (cutoffB > 1.0) cutoffB = 1.0;
+	overA = overB;
+	overB = p_over;
+	underA = underB;
+	underB = p_under;
+	meltdownA = meltdownB;
+	meltdownB = p_meltdwn;
+
+	inTrimA = inTrimB;
+	inTrimB = p_drive*10.0;
+	inTrimB *= inTrimB; inTrimB *= inTrimB;
+	outTrimA = outTrimB;
+	outTrimB = p_output;
+	
+	iirAmountA = 0.00069/overallscale;
+	biquadF[0] = biquadE[0] = 15500.0 / samplerate();
+    biquadF[1] = biquadE[1] = 0.935;
+	K = tan(PI * biquadE[0]); 
+	norm = 1.0 / (1.0 + K / biquadE[1] + K * K);
+	biquadE[2] = K * K * norm;
+	biquadE[3] = 2.0 * biquadE[2];
+	biquadE[4] = biquadE[2];
+	biquadE[5] = 2.0 * (K * K - 1.0) * norm;
+	biquadE[6] = (1.0 - K / biquadE[1] + K * K) * norm;
+	for (x = 0; x < 7; x++) biquadF[x] = biquadE[x];
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+		if (abs(inputSampleL)<1.18e-23) inputSampleL = fpdL * 1.18e-17;
+		if (abs(inputSampleR)<1.18e-23) inputSampleR = fpdR * 1.18e-17;
+		
+		let temp = sampleFrames/inFramesToProcess;
+		let cutoff = (cutoffA*temp)+(cutoffB*(1.0-temp));
+		let over = (overA*temp)+(overB*(1.0-temp));
+		let under = (underA*temp)+(underB*(1.0-temp));
+		let meltdown = (meltdownA*temp)+(meltdownB*(1.0-temp));
+		let inTrim = (inTrimA*temp)+(inTrimB*(1.0-temp));
+		let outTrim = (outTrimA*temp)+(outTrimB*(1.0-temp));
+		let acidTrim = 1.0-pow(cutoff*0.5,1.0/(cutoff*0.5));
+		
+		bezA[bez_cycle] += cutoff;
+		bezA[bez_SampL] += (inputSampleL * cutoff);
+		bezA[bez_SampR] += (inputSampleR * cutoff);
+		
+		if (bezA[bez_cycle] > 1.0) { 
+			bezA[bez_cycle] -= 1.0;
+			bezA[bez_DL] = bezA[bez_CL];
+			bezA[bez_CL] = bezA[bez_BL];
+			bezA[bez_BL] = bezA[bez_AL];
+			bezA[bez_AL] = (bezA[bez_SampL]*(1.0-meltdown))+(inputSampleL*meltdown);
+			bezA[bez_SampL] = 0.0;
+			bezA[bez_DR] = bezA[bez_CR];
+			bezA[bez_CR] = bezA[bez_BR];
+			bezA[bez_BR] = bezA[bez_AR];
+			bezA[bez_AR] = (bezA[bez_SampR]*(1.0-meltdown))+(inputSampleR*meltdown);
+			bezA[bez_SampR] = 0.0;
+		}
+		
+		let X = bezA[bez_cycle]*acidTrim;
+		let midL = bezA[bez_DL] * pow(1.0-X,3.0);
+		midL += bezA[bez_CL] * 3.0 * pow(1.0-X,2.0) * X;
+		midL += bezA[bez_BL] * 3.0 * (1.0-X) * X * X;
+		midL += bezA[bez_AL] * pow(X,3.0);
+		inputSampleL = (midL*under) + ((inputSampleL - midL)*over);
+		
+		let midR = bezA[bez_DR] * pow(1.0-X,3.0);
+		midR += bezA[bez_CR] * 3.0 * pow(1.0-X,2.0) * X;
+		midR += bezA[bez_BR] * 3.0 * (1.0-X) * X * X;
+		midR += bezA[bez_AR] * pow(X,3.0);
+		inputSampleR = (midR*under) + ((inputSampleR - midR)*over);
+		
+		if (inTrim != 1.0) {inputSampleL *= inTrim; inputSampleR *= inTrim;}
+
+		if (abs(iirSampleAL)<1.18e-37) iirSampleAL = 0.0;
+		iirSampleAL = (iirSampleAL * (1.0 - iirAmountA)) + (inputSampleL * iirAmountA);
+		inputSampleL -= iirSampleAL;
+		if (abs(iirSampleAR)<1.18e-37) iirSampleAR = 0.0;
+		iirSampleAR = (iirSampleAR * (1.0 - iirAmountA)) + (inputSampleR * iirAmountA);
+		inputSampleR -= iirSampleAR;
+		
+		let outSample = biquadE[2]*inputSampleL+biquadE[3]*biquadE[7]+biquadE[4]*biquadE[8]-biquadE[5]*biquadE[9]-biquadE[6]*biquadE[10];
+		biquadE[8] = biquadE[7]; biquadE[7] = inputSampleL; inputSampleL = outSample; biquadE[10] = biquadE[9]; biquadE[9] = inputSampleL; 
+		
+		outSample = biquadE[2]*inputSampleR+biquadE[3]*biquadE[11]+biquadE[4]*biquadE[12]-biquadE[5]*biquadE[13]-biquadE[6]*biquadE[14];
+		biquadE[12] = biquadE[11]; biquadE[11] = inputSampleR; inputSampleR = outSample; biquadE[14] = biquadE[13]; biquadE[13] = inputSampleR; 
+		
+		if (inputSampleL > 1.0) inputSampleL = 1.0; if (inputSampleL < -1.0) inputSampleL = -1.0;
+		inputSampleL -= (inputSampleL*inputSampleL*inputSampleL*inputSampleL*inputSampleL*0.1768);
+		if (inputSampleR > 1.0) inputSampleR = 1.0; if (inputSampleR < -1.0) inputSampleR = -1.0;
+		inputSampleR -= (inputSampleR*inputSampleR*inputSampleR*inputSampleR*inputSampleR*0.1768);
+		
+		outSample = biquadF[2]*inputSampleL+biquadF[3]*biquadF[7]+biquadF[4]*biquadF[8]-biquadF[5]*biquadF[9]-biquadF[6]*biquadF[10];
+		biquadF[8] = biquadF[7]; biquadF[7] = inputSampleL; inputSampleL = outSample; biquadF[10] = biquadF[9]; biquadF[9] = inputSampleL; 
+		
+		outSample = biquadF[2]*inputSampleR+biquadF[3]*biquadF[11]+biquadF[4]*biquadF[12]-biquadF[5]*biquadF[13]-biquadF[6]*biquadF[14];
+		biquadF[12] = biquadF[11]; biquadF[11] = inputSampleR; inputSampleR = outSample; biquadF[14] = biquadF[13]; biquadF[13] = inputSampleR; 
+		
+		if (outTrim != 1.0) {inputSampleL *= outTrim; inputSampleR *= outTrim;}		
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

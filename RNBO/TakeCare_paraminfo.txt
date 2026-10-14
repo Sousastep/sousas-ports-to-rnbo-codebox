@@ -1,0 +1,63 @@
+TakeCare — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/takecare/
+
+What it is: a huge modal / delay-network wash (18 lines of 32767-sample
+memory each, about 4.5 MB). It is not a conventional "reverb" but a very
+long, very generative reverberant machine that behaves like three chained
+echo arenas with vibrato, sample-rate slop ("Derez") and a householder-style
+feedback. Sounds like a game-space of a fantasy cathedral AND like an
+old-school analog delay rack. This RNBO port uses the original normalized
+0..1 values and preserves all 18 x 32772 delay cells.
+
+Parameters:
+
+- p_speed (Speed) 0..1, default 0.15
+  Vibrato speed of the whole wash. Internally vibSpeed = p^5 * 0.1, a very
+  steep fifth-power taper; the last 20% of the knob changes the speed far
+  more than the first 80%. Slow settings are "tape-like" drift; fast
+  settings get chorous-y and detuned.
+
+- p_rando (Rando) 0..1, default 0.5
+  Randomization of the vibrato phase/velocity per cycle. Internally
+  p^3 * 0.99 (cubic): at 0 it is a deterministic vibrato, at high values
+  each cycle gets a fresh randomized speed - the fuzz/growl of the space.
+
+- p_depth (Depth) 0..1, default 0.5
+  Vibrato depth as a fraction of the buffer length. Internally p^2 * 0.5
+  (quadratic): 0 = frozen (a long metallic delay), 0.5+ deeply smeared
+  modal washes. One of the two big "mood" controls.
+
+- p_regen (Regen) 0..1, default 0.5
+  Feedback into the lines. Internally p_regen * 0.0625 (max ~ -18 dB per
+  pass). Linear: at 0 the tail decays almost immediately; at 1 it is an
+  endless self-sustaining wash. Be careful: from ~0.8 upward tails get
+  visually "stuck" and can build to clipping (the module does not clip,
+  it just gets loud).
+
+- p_derez (Derez) 0..1, default 0.5
+  Internal sample-rate style darkening ("tape slop") across the whole
+  wash. Internally p*2 gives a 0..2 range folded around the 1.0 midpoint:
+  below 0.5 (of p) it is an undersampled/smoothed dark-down state, above,
+  up to 1.0, it becomes "stepped" (Stillair/-like stepped quantization with
+  the Bezier undersampling). Default 0.5 is a musical middle ground.
+
+- p_buffer (Buffer) 0..1, default 0.5
+  Basic delay length of the arenas. Internally targetBuf = p^3 * 32510 +
+  256 samples: at 0 = tiny (256 samples), at 1 = 0.74 s at 44.1 kHz.
+  Steep cubic taper - the first 50% of the knob only doubles the size.
+  Tails run longer with bigger buffers.
+
+- p_output (Output) 0..1, default 1.0
+  Linear output trim (unity at 1.0). Because of the long feedback, always
+  listen-from-quiet when experimenting with Rando/Regen extremes.
+
+- p_drywet (Dry/Wet) 0..1, default 1.0
+  Wet is internally 1 - (1-p)^2 (a soft "more/less" curve). Note the port
+  preserves the source's signed wet output: p_drywet 0 passes dry audio
+  only (after the source's near-1-second ramp) - it does not make a hard
+  bypass in the middle of a tail.
+
+Musical notes: use it as a do-everything "space" on a reverb return. Give
+it time to develop (the 32767x18 state fills gradually); trial Buffer
+values at 0.1, 0.4, 0.7 to hear three different "rooms". For the classic
+airy "fog horn" sound: Regen 0.6-0.7, Depth 0.5, Derez 0.3, Rando 0.3.

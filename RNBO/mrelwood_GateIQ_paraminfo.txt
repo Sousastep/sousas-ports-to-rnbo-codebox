@@ -1,0 +1,45 @@
+GateIQ 0v2 — mrelwood plugins
+Page: https://mrelwood5.wixsite.com/plugins
+(GateIQ has no individual page on the site; it is listed under Gain in the
+mrelwood plugin list and ships inside the free mrelwood_PluginPack.)
+
+What it is: a smart 4-band downward gate/expander. Each band's detector
+weaks and releases per band with a "smart release time" based on the
+signal frequency. In this RNBO port the active band gain is applied
+TWICE to the signal (intentional, matching the source), and the input is
+summed to MONO when the gate is active - with threshold at -96 dB (the
+lowest position) the module simply passes stereo through untouched
+(README notes). Read-only meter sliders of the source are omitted.
+
+Parameters (original names):
+
+- slider1 (Threshold) (dB) -96..-6, default -45
+  Gate threshold in dBFS; -45 is the reasonable "gate everything below
+  this" position. -96 is special-cased: it bypasses the gate effect
+  while staying stereo (see above). -6 is the most aggressive.
+
+- slider2 (Range) (dB) 0..48, default 20
+  The maximum depth of the gain reduction once a band closes. 0 = no
+  reduction (band stays open), 48 = almost a utility mute. 15-25 dB
+  keeps things "lungingly musical", 48 is heavy noise-floor gating.
+
+- slider4 (Threshold Hi, dB) -12..+12, default 0
+  Per-band detector threshold offset on top of the main threshold, for
+  the HIGH band. Positive = that band triggers at a higher level
+  (gates less often); negative = more likely to gate.
+
+- slider5 (Threshold High Mid, dB) -12..+12, default 0
+  Same style of band offset for the high-mid band.
+
+- slider6 (Threshold Low Mid, dB) -12..+12, default 0
+  Same style of band offset for the low-mid band.
+
+- slider7 (Threshold Low, dB) -12..+12, default 0
+  Same style of band offset for the low band. Typical use: push the
+  lows a bit negative so kick/bass floors stay open even when the
+  top end closes.
+
+Port quirks (README notes): the twice-applied band gain when the gate is
+active is deliberate and matches the JSFX source; threshold -96 dB
+(stereo bypass) is likewise preserved, NOT replaced with an on/off
+switch. The smart release times of the source are retained.

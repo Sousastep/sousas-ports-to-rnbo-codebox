@@ -1,0 +1,31 @@
+ChannelX — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/channelx/
+
+What it is: a channel-wide console strip emulation in the spirit of the
+Airwindows Console system: a saturation stage ("drive"), a treble-tilt "edge"
+element, and a "Dielectric"-style modulation of the harmonics for realism.
+It has been designed for a single channel in a Console mix rather than as a
+master saturator. This RNBO port uses the original normalized 0..1 values.
+
+Parameters:
+
+- p_consoletype (Console Type) 0..1, default 0.0 (5 discrete steps, quintiles)
+  Selects one of 5 console flavors (internally floor(p*4.999); values 0-4):
+  step 0...4 changes the soft-clip threshold and the amount of treble
+  filtering/deadness of the console. Try 0.2, 0.4, 0.6, 0.8, 1.0 exactly -
+  in-between values snap to the next-lower type. Types run from a
+  "neutral-ish" console to progressively wilder/colder ones.
+
+- p_drive (Drive) 0..1, default 0.0
+  Saturation drive on the channel. Internally density = p*2 (clamped at 1),
+  so the midpoint already reaches full "solid" drive; above ~0.5 the extra
+  goes into a "phattity" term that boosts density further (more edge grit).
+  Default 0 = clean console passthrough.
+
+- p_output (Output) 0..1, default 1.0
+  Straight output trim (linear gain 0..1, unity at 1.0).
+
+Musical notes: use a different console type per track for a cohesive Console
+mix; keep Drive small on busses and higher on problem sources. Note: the port
+uses multiplyAdd instead of C++ fused multiply-add (numerical detail only,
+see RNBO/README.md).

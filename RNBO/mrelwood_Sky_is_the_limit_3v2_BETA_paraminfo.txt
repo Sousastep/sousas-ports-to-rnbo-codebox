@@ -1,0 +1,79 @@
+Sky is the Limit 3.2 BETA — mrelwood plugins (Sky Limiter family)
+Page: https://mrelwood5.wixsite.com/plugins/sky
+(Individual page is for the Sky 2.05 release; the 3.2 BETA ships inside
+the free mrelwood_PluginPack. Port keeps the source's own slider names.)
+
+What it is: mrelwood's master limiter, built around a smart combination
+of lookahead/instant limiting, tiltable saturator, pre-compression and
+"safe vs soft clip" character. It is designed to push a master's RMS
+unrealistically high without audible distortion, or to replace a chain of
+compressors/maximizers. This RNBO port preserves the source's initially
+zero limiter histories; slider51/53/62 exist but are inert in the audio
+equations (source behavior, README note) and lookahead CPU cost can be
+high with higher slider51 settings.
+
+Parameters (original names):
+
+- slider1 (Mid/Side) 0..1, default 0.2
+  0 = stereo processing, 1 = mid/side. Low default means most behavior
+  happens in plain L/R and mid is only slightly different - the "2.0"
+  behavior keeps this three-way rather than a hard switch.
+
+- slider2 (Link L/R, M/S) 0..1, default 0.2
+  Detector linkage between channels. At 0 the two channels' limiters
+  run independently; at 1 they are totally linked (no image shift but
+  less "pumping" character). Musically: small values keep natural
+  stereo dynamics, high values make pumping key off the louder of the
+  two pans.
+
+- slider5 (Tilt EQ) -6..+6, default 0 dB
+  Pre-limitation tilt shelves (Sky's characteristic tilt EQ). Positive =
+  brighter master, negative = darker. Not a full EQ - keep 1-2 dB.
+
+- slider6 (Pre Compression Punch) 0..1, default 0
+  Pre-compression stage that adds punch before the limiter. 0 = off;
+  values above 0.3 start to bring out the transient "bite" the
+  limiter would otherwise shave off. For extreme nothing.
+
+- slider7 (Pre Saturation) 0..1, default 0
+  Pre-saturation before the limiter. Small doses warm up the signal so
+  the limiter has less work to do; high values cause more harmonic
+  densifying. Start with 0.1-0.2 on a quiet master.
+
+- slider10 (Limiter / Boost dB) 0..30, default 0
+  The total loudness gain the limiter is allowed to apply. 0 = no
+  limiting; 6-12 dB is the normal working area for a punchy master;
+  20-30 dB is deliberately destructive "crunched" territory.
+
+- slider11 (Safe vs Soft Clip) 0..1, default 0.2
+  Character of the final over-shoot treatment: 0 = "safe" (keeping
+  overshoots mild) to 1 = full soft-clip curve saturation. With the
+  source's slider62 inert, changing this just picks the final shelf's
+  equation. Small values feel master-safe, edging past 0.7 gets
+  distinctly warmer/dirtier.
+
+- slider51 (Look ahead, ~5 ms) 0..1, default 0
+  Lookahead window, internally up to 256 scan cells per active detector
+  per sample - CPU cost scales steeply (README note). 0 = instant
+  limiting (zero latency, aggressive clipping), higher = softer,
+  more program-identifying but slower, and the audible latency is
+  bufsz - 1 samples.
+
+- slider53 (Pre comp) 0..1, default 0
+  NOTE: exists in the source UI but does NOT affect the active audio
+  equations in this version (README note). Whether it becomes active
+  in a later release is mrelwood's call.
+
+- slider60 (Ceiling) -18..0 dB, default -0.1
+  Absolute output ceiling. -0.1 dBFS is standard; -1..-6 are safe
+  choices for loudness-normalization-friendly masters. Keep ceiling at
+  least ~1 dB below 0 to avoid encoder overshoots.
+
+- slider62 (Link Threshold & Volume) 0..1, default 0
+  Same situation as slider53: kept for source parity, inert in the
+  audio path.
+
+Musical notes: for a punchy master, Slot 10 to 6-10 dB, slider6 at 0.3,
+Tilt about +1, Ceiling -1 dB, and choose Safe/Soft around 0.3. When the
+master pumps, lower slider6 first - a louder-transparent master isn't
+just about maximizing the boost knob.

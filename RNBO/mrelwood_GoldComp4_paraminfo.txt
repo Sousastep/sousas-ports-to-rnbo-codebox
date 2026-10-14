@@ -1,0 +1,102 @@
+GoldComp 4 — mrelwood plugins
+Page: https://mrelwood5.wixsite.com/plugins
+(GoldComp4 has no individual page on the site; it is listed and distributed
+inside the free mrelwood_PluginPack.)
+
+What it is: mrelwood's "latest go-to compressor for everything": a stereo
+(or M/S) program compressor with knee, ratio, attack/release, an
+FET-vs-opto release flavor switch, detector HP, oversampling selector (the
+source's 6 detector paths), RMS-target makeup, negative (upward) expansion
+and a built-in limiter on the output. This RNBO port keeps all of the
+source's detector paths; it does NOT oversample the waveform itself
+(README note). Parameters use the original JSFX slider units.
+
+Parameters (original names; slider1 "Stereo", slider2..21 in file):
+
+- slider2  (Stereo: L/R - M/S) 0..1, default 0.5
+  0 = plain stereo processing, 1 = mid/side processing. Beyond ~0.9 the
+  source effectively always uses M/S curves; near 0.5 the crossover is
+  smooth. Musically: M/S on program material, L/R on sparse/single
+  sources.
+
+- slider3  (L/R Link) 0..1, default 0.7
+  How much the two channels' detectors are linked. 0 = fully
+  independent (chases wide images), 1 = fully linked (no image shift).
+  Default 0.7 is a good mix glue setting.
+
+- slider4  (Side thr offset) -15..0, default -6 dB
+  In M/S mode, the amount by which the side channel detector is offset
+  relative to mid. Negative = side compressed earlier/harder, which
+  tightens wide imaging - useful on stems like drum overheads.
+
+- slider5  (Threshold) -48..0, default 0 dB
+  Detector threshold in dBFS. 0 = no compression (limiter off); -6
+  start of normal crushing territory.
+
+- slider7  (Attack) 0.02..50, default 5 ms
+  Attack time per 12 dB of GR (labelled "ms/12dB" in the source). Log
+  taper built into the detector: short attacks (<5 ms) let
+  transients through fairly free; long attacks give that classic
+  soft-knee squash. 0.02 ms is essentially instant.
+
+-  slider8 (Ratio) 1..12, default 4
+  Compression ratio (ratio 1 = off). Above ~8 approaches hard limiting,
+  below 3 is gentle leveling.
+
+- slider9  (Release) 10..2000, default 120 ms
+  Release time per 12 dB of GR. Pre-120 is quick punch recovery, past
+  500-1000 pumps are slow and梯 continuous (great for glue,
+  dangerous on fast material).
+
+- slider10 (Opto Release, FET - Opto) 0..1, default 1
+  Release character: 0 = FET-style fast/synthety independent recovery,
+  1 = Opto-style program-dependent slower release. Discrete switch, not
+  tapered.
+
+- slider11 (OverSampling) 0..6, default 0
+  The source's internally available detector oversampling selection
+  (0 = no extra detector paths active). This RNBO port faithfully
+  retains all 7 numeric detector configurations - although, as noted,
+  it does NOT oversample audio itself (README).
+
+- slider12 (RMS Target) -36..-6, default -24 dB
+  The original calculated makeup gain target, NOT a new RMS controller
+  (README note). Higher (closer to -6) = very high calculated makeup
+  (louder bass result), lower/-36 keeps output near unity.
+
+- slider13 (Output Trim) -24..+24, default 0 dB
+  Straight output level trim in dB.
+
+- slider15 (Limiter) 0..1, default 1 (off in the source, on in the port)
+  Output limiter stage. NOTE: the source uses 1 = OFF for this control
+  (it is an off/on switch; the port default 1 leaves it off). When on
+  it catches the remaining overshoots of the compressor/limiter path -
+  handy when pushing threshold very low.
+
+- slider16 (Detector HP) 20..1000 Hz, default 20
+  Highpass of the sidechain detector. 20 Hz = full-band detection;
+  50-150 Hz removes the kick/bass from detection so the compressor
+  doesn't over-react to synth bass; 500-1000 turns it into a
+  vocal/brightness-only detector.
+
+- slider17 (Mix) 0..100, default 100 %
+  Dry/wet style parallel LeCompt blend of compressed and dry audio.
+
+- slider20 (Tilt EQ) -12..+12, default 0 dB
+  Built-in wide tilt shelves on the audio buss (not on the detector).
+  Positive = brighter/tilted up, negative = darker/tilted down. Not a
+  replacement for an EQ - keep it subtle (+/- 1-2 dB).
+
+- slider21 (NegExp, Ratio) 1..4, default 1
+  Negative (upward) expansion ratio. Above 1 it lifts very quiet
+  passages, which makes an interesting "thinner but detailed" master.
+  Leave at 1 for a plain compressor; use 2-4 for subtle "loudrooms
+  dreaminess" or floor noise lifting.
+
+Port quirks (README notes): the width slider label in the source's GR
+display and its related meters are omitted; slider13 output trim and
+slider12 RMS target control the original calculated makeup. The attdb
+variable in the source is zero (its assignment line is commented out) and
+its wide tilt shelves, detector HP, negative expansion and post-mix
+limiter are all retained in the port. slider17 = 0 with limiter off
+passes dry audio.

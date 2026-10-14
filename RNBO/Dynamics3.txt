@@ -1,0 +1,192 @@
+/* Dynamics3 — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Thresh
+@param({ min: 0, max: 1 }) p_thresh = 1.0;
+// VST B: Attack
+@param({ min: 0, max: 1 }) p_attack = 0.382;
+// VST C: Release
+@param({ min: 0, max: 1 }) p_release = 0.618;
+// VST D: Inv/Wet
+@param({ min: 0, max: 1 }) p_invwet = 1.0;
+
+const bez_A = 0;
+const bez_B = 1;
+const bez_C = 2;
+const bez_Ctrl = 3;
+const bez_cycle = 4;
+const bez_min = 5;
+const bez_comp = 6;
+const bez_total = 7;
+@state bezComp = new FixedFloat64Array(bez_total);
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state bezThresh = 0;
+@state sqrThresh = 0;
+@state bezRez = 0;
+@state stepped: Int = 0;
+@state bezTrim = 0;
+@state sloRez = 0;
+@state invDry = 0;
+@state compress = 0;
+@state compBypass = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+function init() {
+
+	for (let x: Int = 0; x < bez_total; x++) bezComp[x] = 0.0;
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 1.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();
+
+	bezThresh = pow(p_thresh+0.6180339887498949,2.0)*1.6180339887498949;
+	sqrThresh = sqrt(bezThresh);
+	bezRez = maximum(pow((1.0-p_attack)*0.4,4.0)/overallscale,0.0001); 
+	bezRez /= (2.0/pow(overallscale,0.5-((overallscale-1.0)*0.0375)));
+	stepped = 999999; if (bezRez > 0.000001) stepped = toIndex(1.0/bezRez);
+	bezRez = 0.99999999 / stepped;
+	bezTrim = 1.0-(bezRez*(stepped/(stepped+1.0)));
+	sloRez = maximum(pow((1.0-p_release)*0.4,4.0)/overallscale,0.00001);
+	sloRez /= (2.0/pow(overallscale,0.5-((overallscale-1.0)*0.0375)));
+	invDry = pow(1.0-(abs(p_invwet-0.5)*2.0),1.6180339887498949);
+	compress = (p_invwet > 0.499999);
+	compBypass = (bezThresh > 4.236);
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+		if (abs(inputSampleL)<1.18e-23) inputSampleL = fpdL * 1.18e-17;
+		if (abs(inputSampleR)<1.18e-23) inputSampleR = fpdR * 1.18e-17;
+		
+		if (!compBypass) {
+			
+			let dryCompL = inputSampleL;
+			let dryCompR = inputSampleR;
+			if (compress) {
+				inputSampleL *= (bezComp[bez_comp]/bezThresh);
+				inputSampleR *= (bezComp[bez_comp]/bezThresh);
+			} else {
+				inputSampleL /= bezThresh;
+				inputSampleR /= bezThresh;
+			}
+			let ctrl = minimum(maximum(abs(inputSampleL),abs(inputSampleR)),sqrThresh*bezComp[bez_comp]*0.6180339887498949);
+			bezComp[bez_min] = maximum(bezComp[bez_min]-sloRez,ctrl);
+			bezComp[bez_Ctrl] += (bezComp[bez_min] * bezRez);
+			bezComp[bez_cycle] += bezRez;
+			if (bezComp[bez_cycle] > bezTrim) {bezComp[bez_cycle] = 0.0;
+				bezComp[bez_C] = bezComp[bez_B]; bezComp[bez_B] = bezComp[bez_A];
+				bezComp[bez_A] = bezComp[bez_Ctrl]; bezComp[bez_Ctrl] = 0.0;}
+			let X = bezComp[bez_cycle];
+			bezComp[bez_comp] = bezComp[bez_B]+(bezComp[bez_C]*(1.0-X)*(1.0-X))+(bezComp[bez_B]*2.0*(1.0-X)*X)+(bezComp[bez_A]*X*X);
+			bezComp[bez_comp] = ((1.0-(minimum(bezComp[bez_comp],0.9999))));
+			if (compress) {
+				inputSampleL = inputSampleL*(1.0-invDry)*bezComp[bez_comp]*bezThresh;
+				inputSampleL = maximum(minimum(inputSampleL,2.305929007734908),-2.305929007734908);
+				let addtwo = inputSampleL * inputSampleL;
+				let empower = inputSampleL * addtwo; 
+				inputSampleL -= (empower / 6.0); empower *= addtwo; 
+				inputSampleL += (empower / 69.0); empower *= addtwo; 
+				inputSampleL -= (empower / 2530.08); empower *= addtwo; 
+				inputSampleL += (empower / 224985.6); empower *= addtwo; 
+				inputSampleL -= (empower / 9979200.0);				
+				
+				inputSampleL += dryCompL*invDry*(1.0-(bezComp[bez_comp]*(1.0-invDry)));
+				inputSampleR = inputSampleR*(1.0-invDry)*bezComp[bez_comp]*bezThresh;
+				inputSampleR = maximum(minimum(inputSampleR,2.305929007734908),-2.305929007734908);
+				addtwo = inputSampleR * inputSampleR;
+				empower = inputSampleR * addtwo; 
+				inputSampleR -= (empower / 6.0); empower *= addtwo; 
+				inputSampleR += (empower / 69.0); empower *= addtwo; 
+				inputSampleR -= (empower / 2530.08); empower *= addtwo; 
+				inputSampleR += (empower / 224985.6); empower *= addtwo; 
+				inputSampleR -= (empower / 9979200.0);
+				
+				inputSampleR += dryCompR*invDry*(1.0-(bezComp[bez_comp]*(1.0-invDry)));
+			} else {
+				inputSampleL = ((inputSampleL/(0.1+bezThresh))*(1.0-invDry))/bezComp[bez_comp];
+				inputSampleL = maximum(minimum(inputSampleL,2.305929007734908),-2.305929007734908);
+				let addtwo = inputSampleL * inputSampleL;
+				let empower = inputSampleL * addtwo; 
+				inputSampleL -= (empower / 6.0); empower *= addtwo; 
+				inputSampleL += (empower / 69.0); empower *= addtwo; 
+				inputSampleL -= (empower / 2530.08); empower *= addtwo; 
+				inputSampleL += (empower / 224985.6); empower *= addtwo; 
+				inputSampleL -= (empower / 9979200.0);				
+				
+				inputSampleL += dryCompL*invDry*(1.0-(bezComp[bez_comp]*(1.0-invDry)));				
+				inputSampleR = ((inputSampleR/(0.1+bezThresh))*(1.0-invDry))/bezComp[bez_comp];
+				inputSampleR = maximum(minimum(inputSampleR,2.305929007734908),-2.305929007734908);
+				addtwo = inputSampleR * inputSampleR;
+				empower = inputSampleR * addtwo; 
+				inputSampleR -= (empower / 6.0); empower *= addtwo; 
+				inputSampleR += (empower / 69.0); empower *= addtwo; 
+				inputSampleR -= (empower / 2530.08); empower *= addtwo; 
+				inputSampleR += (empower / 224985.6); empower *= addtwo; 
+				inputSampleR -= (empower / 9979200.0);
+				
+				inputSampleR += dryCompR*invDry*(1.0-(bezComp[bez_comp]*(1.0-invDry)));
+			}
+		} 
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+		if (unsigned32(fpdL-fpdR) < 1073741824 || unsigned32(fpdR-fpdL) < 1073741824) {
+			fpdR = advanceRandom(fpdR);}
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

@@ -1,0 +1,830 @@
+/* Ultralight2 — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Damping
+@param({ min: 0, max: 1 }) p_damping = 0.65;
+// VST B: UnSolid
+@param({ min: 0, max: 1 }) p_unsolid = 0.75;
+// VST C: UnReflc
+@param({ min: 0, max: 1 }) p_unreflc = 0.75;
+// VST D: Predlay
+@param({ min: 0, max: 1 }) p_predlay = 0.54;
+// VST E: Dry/Wet
+@param({ min: 0, max: 1 }) p_drywet = 0.5;
+// VST F: Distnce
+@param({ min: 0, max: 1 }) p_distnce = 0.0;
+
+const d4A = 1317;
+const d4B = 40;
+const d4C = 71;
+const d4D = 74;
+const d4E = 2139;
+const d4F = 65;
+const d4G = 350;
+const d4H = 2025;
+const d4I = 654;
+const d4J = 686;
+const d4K = 384;
+const d4L = 257;
+const d4M = 1743;
+const d4N = 1764;
+const d4O = 217;
+const d4P = 1751;
+const d4Q = 1880;
+const d4R = 910;
+const d4S = 620;
+const d4T = 7920;
+const d4U = 5;
+const d4V = 4;
+const d4W = 4;
+@state prime = new FixedIntArray([3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,199,211,223,227,229,233,239,241,251,257,263,269,271,277,281,283,293,307,311,313,317,331,337,347,349,353,359,367,373,379,383,389,397,401,409,419,421,431,433,439,443,449,457,461,463,467,479,487,491,499,503,509,521,523,541,547,557,563,569,571,577,587,593,599,601,607,613,617,619,631,641,643,647,653,659,661,673,677,683,691,701,709,719,727,733,739,743,751,757,761,769,773,787,797,809,811,821,823,827,829,839,853,857,859,863,877,881,883,887,907,911,919,929,937,941,947,953,967,971,977,983,991,997,1009,1013,1019,1021,1031,1033,1039,1049,1051,1061,1063,1069,1087,1091,1093,1097,1103,1109,1117,1123,1129,1151,1153,1163,1171,1181,1187,1193,1201,1213,1217,1223,1229,1231,1237,1249,1259,1277,1279,1283,1289,1291,1297,1301,1303,1307,1319,1321,1327,1361,1367,1373,1381,1399,1409,1423,1427,1429,1433,1439,1447,1451,1453,1459,1471,1481,1483,1487,1489,1493,1499,1511,1523,1531,1543,1549,1553,1559,1567,1571,1579,1583,1597,1601,1607,1609,1613,1619,1621,1627,1637,1657,1663,1667,1669,1693,1697,1699,1709,1721,1723,1733,1741,1747,1753,1759,1777,1783,1787,1789,1801,1811,1823,1831,1847,1861,1867,1871,1873,1877,1879,1889,1901,1907,1913,1931,1933,1949,1951,1973,1979,1987,1993,1997,1999,2003,2011,2017,2027,2029,2039,2053,2063,2069,2081,2083,2087,2089,2099,2111,2113,2129,2131,2137,2141,2143,2153,2161,2179,2203,2207,2213,2221,2237,2239,2243,2251,2267,2269,2273,2281,2287,2293,2297,2309,2311,2333,2339,2341,2347,2351,2357,2371,2377,2381,2383,2389,2393,2399,2411,2417,2423,2437,2441,2447,2459,2467,2473,2477,2503,2521,2531,2539,2543,2549,2551,2557,2579,2591,2593,2609,2617,2621,2633,2647,2657,2659,2663,2671,2677,2683,2687,2689,2693,2699,2707,2711,2713,2719,2729,2731,2741,2749,2753,2767,2777,2789,2791,2797,2801,2803,2819,2833,2837,2843,2851,2857,2861,2879,2887,2897,2903,2909,2917,2927,2939,2953,2957,2963,2969,2971,2999,3001,3011,3019,3023,3037,3041,3049,3061,3067,3079,3083,3089,3109,3119,3121,3137,3163,3167,3169,3181,3187,3191,3203,3209,3217,3221,3229,3251,3253,3257,3259,3271,3299,3301,3307,3313,3319,3323,3329,3331,3343,3347,3359,3361,3371,3373,3389,3391,3407,3413,3433,3449,3457,3461,3463,3467,3469,3491,3499,3511,3517,3527,3529,3533,3539,3541,3547,3557,3559,3571,3581,3583,3593,3607,3613,3617,3623,3631,3637,3643,3659,3671,3673,3677,3691,3697,3701,3709,3719,3727,3733,3739,3761,3767,3769,3779,3793,3797,3803,3821,3823,3833,3847,3851,3853,3863,3877,3881,3889,3907,3911,3917,3919,3923,3929,3931,3943,3947,3967,3989,4001,4003,4007,4013,4019,4021,4027,4049,4051,4057,4073,4079,4091,4093,4099,4111,4127,4129,4133,4139,4153,4157,4159,4177,4201,4211,4217,4219,4229,4231,4241,4243,4253,4259,4261,4271,4273,4283,4289,4297,4327,4337,4339,4349,4357,4363,4373,4391,4397,4409,4421,4423,4441,4447,4451,4457,4463,4481,4483,4493,4507,4513,4517,4519,4523,4547,4549,4561,4567,4583,4591,4597,4603,4621,4637,4639,4643,4649,4651,4657,4663,4673,4679,4691,4703,4721,4723,4729,4733,4751,4759,4783,4787,4789,4793,4799,4801,4813,4817,4831,4861,4871,4877,4889,4903,4909,4919,4931,4933,4937,4943,4951,4957,4967,4969,4973,4987,4993,4999,5003,5009,5011,5021,5023,5039,5051,5059,5077,5081,5087,5099,5101,5107,5113,5119,5147,5153,5167,5171,5179,5189,5197,5209,5227,5231,5233,5237,5261,5273,5279,5281,5297,5303,5309,5323,5333,5347,5351,5381,5387,5393,5399,5407,5413,5417,5419,5431,5437,5441,5443,5449,5471,5477,5479,5483,5501,5503,5507,5519,5521,5527,5531,5557,5563,5569,5573,5581,5591,5623,5639,5641,5647,5651,5653,5657,5659,5669,5683,5689,5693,5701,5711,5717,5737,5741,5743,5749,5779,5783,5791,5801,5807,5813,5821,5827,5839,5843,5849,5851,5857,5861,5867,5869,5879,5881,5897,5903,5923,5927,5939,5953,5981,5987,6007,6011,6029,6037,6043,6047,6053,6067,6073,6079,6089,6091,6101,6113,6121,6131,6133,6143,6151,6163,6173,6197,6199,6203,6211,6217,6221,6229,6247,6257,6263,6269,6271,6277,6287,6299,6301,6311,6317,6323,6329,6337,6343,6353,6359,6361,6367,6373,6379,6389,6397,6421,6427,6449,6451,6469,6473,6481,6491,6521,6529,6547,6551,6553,6563,6569,6571,6577,6581,6599,6607,6619,6637,6653,6659,6661,6673,6679,6689,6691,6701,6703,6709,6719,6733,6737,6761,6763,6779,6781,6791,6793,6803,6823,6827,6829,6833,6841,6857,6863,6869,6871,6883,6899,6907,6911,6917,6947,6949,6959,6961,6967,6971,6977,6983,6991,6997,7001,7013,7019,7027,7039,7043,7057,7069,7079,7103,7109,7121,7127,7129,7151,7159,7177,7187,7193,7207,7211,7213,7219,7229,7237,7243,7247,7253,7283,7297,7307,7309,7321,7331,7333,7349,7351,7369,7393,7411,7417,7433,7451,7457,7459,7477,7481,7487,7489,7499,7507,7517,7523,7529,7537,7541,7547,7549,7559,7561,7573,7577,7583,7589,7591,7603,7607,7621,7639,7643,7649,7669,7673,7681,7687,7691,7699,7703,7717,7723,7727,7741,7753,7757,7759,7789,7793,7817,7823,7829,7841,7853,7867,7873,7877,7879,7883,7901,7907,7919]);
+@state lA = new FixedFloat32Array(d4A+5);
+@state lB = new FixedFloat32Array(d4B+5);
+@state lC = new FixedFloat32Array(d4C+5);
+@state lD = new FixedFloat32Array(d4D+5);
+@state lE = new FixedFloat32Array(d4E+5);
+@state lF = new FixedFloat32Array(d4F+5);
+@state lG = new FixedFloat32Array(d4G+5);
+@state lH = new FixedFloat32Array(d4H+5);
+@state lI = new FixedFloat32Array(d4I+5);
+@state lJ = new FixedFloat32Array(d4J+5);
+@state lK = new FixedFloat32Array(d4K+5);
+@state lL = new FixedFloat32Array(d4L+5);
+@state lM = new FixedFloat32Array(d4M+5);
+@state lN = new FixedFloat32Array(d4N+5);
+@state lO = new FixedFloat32Array(d4O+5);
+@state lP = new FixedFloat32Array(d4P+5);
+@state lQ = new FixedFloat32Array(d4Q+5);
+@state lR = new FixedFloat32Array(d4R+5);
+@state lS = new FixedFloat32Array(d4S+5);
+@state lT = new FixedFloat32Array(d4T+5);
+@state rA = new FixedFloat32Array(d4A+5);
+@state rB = new FixedFloat32Array(d4B+5);
+@state rC = new FixedFloat32Array(d4C+5);
+@state rD = new FixedFloat32Array(d4D+5);
+@state rE = new FixedFloat32Array(d4E+5);
+@state rF = new FixedFloat32Array(d4F+5);
+@state rG = new FixedFloat32Array(d4G+5);
+@state rH = new FixedFloat32Array(d4H+5);
+@state rI = new FixedFloat32Array(d4I+5);
+@state rJ = new FixedFloat32Array(d4J+5);
+@state rK = new FixedFloat32Array(d4K+5);
+@state rL = new FixedFloat32Array(d4L+5);
+@state rM = new FixedFloat32Array(d4M+5);
+@state rN = new FixedFloat32Array(d4N+5);
+@state rO = new FixedFloat32Array(d4O+5);
+@state rP = new FixedFloat32Array(d4P+5);
+@state rQ = new FixedFloat32Array(d4Q+5);
+@state rR = new FixedFloat32Array(d4R+5);
+@state rS = new FixedFloat32Array(d4S+5);
+@state rT = new FixedFloat32Array(d4T+5);
+@state cA: Int = 0;
+@state cB: Int = 0;
+@state cC: Int = 0;
+@state cD: Int = 0;
+@state cE: Int = 0;
+@state cF: Int = 0;
+@state cG: Int = 0;
+@state cH: Int = 0;
+@state cI: Int = 0;
+@state cJ: Int = 0;
+@state cK: Int = 0;
+@state cL: Int = 0;
+@state cM: Int = 0;
+@state cN: Int = 0;
+@state cO: Int = 0;
+@state cP: Int = 0;
+@state cQ: Int = 0;
+@state cR: Int = 0;
+@state cS: Int = 0;
+@state cT: Int = 0;
+@state oQL = 0;
+@state oRL = 0;
+@state oSL = 0;
+@state oTL = 0;
+@state fAL = 0;
+@state fBL = 0;
+@state fCL = 0;
+@state fDL = 0;
+@state fhAL = 0;
+@state fhBL = 0;
+@state fhCL = 0;
+@state fhDL = 0;
+@state flAL = 0;
+@state flBL = 0;
+@state flCL = 0;
+@state flDL = 0;
+@state hAL = 0;
+@state hBL = 0;
+@state hCL = 0;
+@state hDL = 0;
+@state hEL = 0;
+@state oQR = 0;
+@state oRR = 0;
+@state oSR = 0;
+@state oTR = 0;
+@state fAR = 0;
+@state fBR = 0;
+@state fCR = 0;
+@state fDR = 0;
+@state fhAR = 0;
+@state fhBR = 0;
+@state fhCR = 0;
+@state fhDR = 0;
+@state flAR = 0;
+@state flBR = 0;
+@state flCR = 0;
+@state flDR = 0;
+@state hAR = 0;
+@state hBR = 0;
+@state hCR = 0;
+@state hDR = 0;
+@state hER = 0;
+@state firstDryL = 0;
+@state firstAvgL = 0;
+@state lsA = 0;
+@state lsB = 0;
+@state lsC = 0;
+@state lsD = 0;
+@state lsE = 0;
+@state lsF = 0;
+@state lsG = 0;
+@state lsH = 0;
+@state lsI = 0;
+@state lsJ = 0;
+@state lsK = 0;
+@state lsL = 0;
+@state lsM = 0;
+@state lsN = 0;
+@state lsO = 0;
+@state lsP = 0;
+@state lsQ = 0;
+@state lsR = 0;
+@state lsS = 0;
+@state lsT = 0;
+@state lsU = 0;
+@state lsV = 0;
+@state lsW = 0;
+@state lsX = 0;
+@state lsY = 0;
+@state lsZ = 0;
+@state lsa = 0;
+@state lsb = 0;
+@state lsc = 0;
+@state lsd = 0;
+@state lse = 0;
+@state lsf = 0;
+@state lsg = 0;
+@state lsh = 0;
+@state lsi = 0;
+@state lsj = 0;
+@state lsk = 0;
+@state lsl = 0;
+@state lsm = 0;
+@state lsn = 0;
+@state lso = 0;
+@state lsp = 0;
+@state lsq = 0;
+@state lsr = 0;
+@state lss = 0;
+@state lst = 0;
+@state lsu = 0;
+@state lsv = 0;
+@state lsw = 0;
+@state lsx = 0;
+@state lsy = 0;
+@state lsz = 0;
+@state firstDryR = 0;
+@state firstAvgR = 0;
+@state rsA = 0;
+@state rsB = 0;
+@state rsC = 0;
+@state rsD = 0;
+@state rsE = 0;
+@state rsF = 0;
+@state rsG = 0;
+@state rsH = 0;
+@state rsI = 0;
+@state rsJ = 0;
+@state rsK = 0;
+@state rsL = 0;
+@state rsM = 0;
+@state rsN = 0;
+@state rsO = 0;
+@state rsP = 0;
+@state rsQ = 0;
+@state rsR = 0;
+@state rsS = 0;
+@state rsT = 0;
+@state rsU = 0;
+@state rsV = 0;
+@state rsW = 0;
+@state rsX = 0;
+@state rsY = 0;
+@state rsZ = 0;
+@state rsa = 0;
+@state rsb = 0;
+@state rsc = 0;
+@state rsd = 0;
+@state rse = 0;
+@state rsf = 0;
+@state rsg = 0;
+@state rsh = 0;
+@state rsi = 0;
+@state rsj = 0;
+@state rsk = 0;
+@state rsl = 0;
+@state rsm = 0;
+@state rsn = 0;
+@state rso = 0;
+@state rsp = 0;
+@state rsq = 0;
+@state rsr = 0;
+@state rss = 0;
+@state rst = 0;
+@state rsu = 0;
+@state rsv = 0;
+@state rsw = 0;
+@state rsx = 0;
+@state rsy = 0;
+@state rsz = 0;
+@state prevDistance: Int = 0;
+@state pointCycle = 0;
+@state pointAL = 0;
+@state pointBL = 0;
+@state pointAR = 0;
+@state pointBR = 0;
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state pointDerez = 0;
+@state bypassPre = 0;
+@state X = 0;
+@state dpT: Int = 0;
+@state dpQ: Int = 0;
+@state dpR: Int = 0;
+@state dpS: Int = 0;
+@state bypassVerb = 0;
+@state damping = 0;
+@state unSolid: Int = 0;
+@state unReflect: Int = 0;
+@state wet = 0;
+@state distance = 0;
+@state distanceSteps: Int = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+// RNBO has no fused multiply-add operator; preserve the equation.
+function multiplyAdd(a, b, c) { return a * b + c; }
+
+@state floatCast = new FixedFloat32Array(1);
+function asFloat32(x) { floatCast[0] = x; return floatCast[0]; }
+
+function init() {
+
+	for(let x: Int = 0; x < d4A+2; x++) {lA[x] = 0.0; rA[x] = 0.0;}
+	for(let x: Int = 0; x < d4B+2; x++) {lB[x] = 0.0; rB[x] = 0.0;}
+	for(let x: Int = 0; x < d4C+2; x++) {lC[x] = 0.0; rC[x] = 0.0;}
+	for(let x: Int = 0; x < d4D+2; x++) {lD[x] = 0.0; rD[x] = 0.0;}
+	for(let x: Int = 0; x < d4E+2; x++) {lE[x] = 0.0; rE[x] = 0.0;}
+	for(let x: Int = 0; x < d4F+2; x++) {lF[x] = 0.0; rF[x] = 0.0;}
+	for(let x: Int = 0; x < d4G+2; x++) {lG[x] = 0.0; rG[x] = 0.0;}
+	for(let x: Int = 0; x < d4H+2; x++) {lH[x] = 0.0; rH[x] = 0.0;}
+	for(let x: Int = 0; x < d4I+2; x++) {lI[x] = 0.0; rI[x] = 0.0;}
+	for(let x: Int = 0; x < d4J+2; x++) {lJ[x] = 0.0; rJ[x] = 0.0;}
+	for(let x: Int = 0; x < d4K+2; x++) {lK[x] = 0.0; rK[x] = 0.0;}
+	for(let x: Int = 0; x < d4L+2; x++) {lL[x] = 0.0; rL[x] = 0.0;}
+	for(let x: Int = 0; x < d4M+2; x++) {lM[x] = 0.0; rM[x] = 0.0;}
+	for(let x: Int = 0; x < d4N+2; x++) {lN[x] = 0.0; rN[x] = 0.0;}
+	for(let x: Int = 0; x < d4O+2; x++) {lO[x] = 0.0; rO[x] = 0.0;}
+	for(let x: Int = 0; x < d4P+2; x++) {lP[x] = 0.0; rP[x] = 0.0;}
+	for(let x: Int = 0; x < d4Q+2; x++) {lQ[x] = 0.0; rQ[x] = 0.0;}
+	for(let x: Int = 0; x < d4R+2; x++) {lR[x] = 0.0; rR[x] = 0.0;}
+	for(let x: Int = 0; x < d4S+2; x++) {lS[x] = 0.0; rS[x] = 0.0;}
+	for(let x: Int = 0; x < d4T+2; x++) {lT[x] = 0.0; rT[x] = 0.0;}
+	
+	cA = cB = cC = cD = cE = cF = cG = cH = 1;
+	cI = cJ = cK = cL = cM = cN = cO = cP = 1;
+	cQ = cR = cS = cT = 1;
+	
+	oQL = asFloat32(oRL = oSL = oTL = 0.0);
+	fAL = asFloat32(fBL = fCL = fDL = 0.0);
+	fhAL = asFloat32(fhBL = fhCL = fhDL = 0.0);
+	flAL = asFloat32(flBL = flCL = flDL = 0.0);
+	hAL = asFloat32(hBL = hCL = hDL = hEL = 0.0);
+	
+	oQR = asFloat32(oRR = oSR = oTR = 0.0);
+	fAR = asFloat32(fBR = fCR = fDR = 0.0);
+	fhAR = asFloat32(fhBR = fhCR = fhDR = 0.0);
+	flAR = asFloat32(flBR = flCR = flDR = 0.0);
+	hAR = asFloat32(hBR = hCR = hDR = hER = 0.0);
+	
+	firstDryL = asFloat32(firstAvgL = 0.0);
+	lsA = asFloat32(lsB = lsC = lsD = lsE = lsF = lsG = lsH = lsI = lsJ = lsK = lsL = lsM = 0.0);
+	lsN = asFloat32(lsO = lsP = lsQ = lsR = lsS = lsT = lsU = lsV = lsW = lsX = lsY = lsZ = 0.0);
+	lsa = asFloat32(lsb = lsc = lsd = lse = lsf = lsg = lsh = lsi = lsj = lsk = lsl = lsm = 0.0);
+	lsn = asFloat32(lso = lsp = lsq = lsr = lss = lst = lsu = lsv = lsw = lsx = lsy = lsz = 0.0);	
+	firstDryR = asFloat32(firstAvgR = 0.0);
+	rsA = asFloat32(rsB = rsC = rsD = rsE = rsF = rsG = rsH = rsI = rsJ = rsK = rsL = rsM = 0.0);
+	rsN = asFloat32(rsO = rsP = rsQ = rsR = rsS = rsT = rsU = rsV = rsW = rsX = rsY = rsZ = 0.0);
+	rsa = asFloat32(rsb = rsc = rsd = rse = rsf = rsg = rsh = rsi = rsj = rsk = rsl = rsm = 0.0);
+	rsn = asFloat32(rso = rsp = rsq = rsr = rss = rst = rsu = rsv = rsw = rsx = rsy = rsz = 0.0);	
+	
+	prevDistance = 0;
+	pointCycle = asFloat32(pointAL = pointBL = pointAR = pointBR = 0.0);	
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = asFloat32(1.0);
+	overallscale = asFloat32(overallscale / (48000.0));
+	overallscale = asFloat32(overallscale * (samplerate()));
+	pointDerez = asFloat32(1.0 / overallscale); 
+	
+	bypassPre = ((toIndex(p_predlay*998.0)) < 1); 
+	
+	X = asFloat32(p_predlay*998.0);
+let readIndex1: Int = trunc(X);
+	dpT = prime[readIndex1];
+	X = asFloat32(sqrt(X*81.408));
+let readIndex2: Int = trunc(X);
+	dpQ = prime[readIndex2];
+	X = asFloat32(sqrt(X*81.408));
+let readIndex3: Int = trunc(X);
+	dpR = prime[readIndex3];
+	X = asFloat32(sqrt(X*81.408));
+let readIndex4: Int = trunc(X);
+	dpS = prime[readIndex4];
+
+	bypassVerb = ((toIndex(p_damping*9.99)) < 1); 
+	
+	damping = asFloat32(0.0625-((toIndex(p_damping*9.99))*0.003125)); 
+	unSolid = 4-toIndex(p_unsolid*4.99); 
+	unReflect = 4-toIndex(p_unreflc*4.99); 
+
+	wet = asFloat32(p_drywet);
+
+	distance = asFloat32(pow(p_distnce*7.28,2.0)); 
+	distanceSteps = toIndex(distance); 
+	distance = asFloat32(distance - (distanceSteps)); 
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = asFloat32(in1);
+		let inputSampleR = asFloat32(in2);
+		if (abs(inputSampleL)<1.18e-23) inputSampleL = asFloat32(fpdL * 1.18e-17);
+		if (abs(inputSampleR)<1.18e-23) inputSampleR = asFloat32(fpdR * 1.18e-17);
+		
+		pointCycle = asFloat32(pointCycle + (pointDerez));
+		if (pointCycle > 0.9999999) {
+
+			let drySampleL = asFloat32(inputSampleL);
+			let drySampleR = asFloat32(inputSampleR);
+
+			oQL = asFloat32(oRL - (lQ[(cQ+1)-((cQ+1 > dpQ)?dpQ+1:0)]*0.5));
+			oRL = asFloat32(oSL - (lR[(cR+1)-((cR+1 > dpR)?dpR+1:0)]*0.5));
+			oSL = asFloat32(oTL - (lS[(cS+1)-((cS+1 > dpS)?dpS+1:0)]*0.5));
+			oTL = asFloat32(inputSampleL); 
+			oQR = asFloat32(oRR - (rQ[(cQ+1)-((cQ+1 > dpQ)?dpQ+1:0)]*0.5));
+			oRR = asFloat32(oSR - (rR[(cR+1)-((cR+1 > dpR)?dpR+1:0)]*0.5));
+			oSR = asFloat32(oTR - (rS[(cS+1)-((cS+1 > dpS)?dpS+1:0)]*0.5));
+			oTR = asFloat32(inputSampleR); 
+			lQ[cQ] = oQL; lR[cR] = oRL; lS[cS] = oSL; lT[cT] = oTL;
+			rQ[cQ] = oQR; rR[cR] = oRR; rS[cS] = oSR; rT[cT] = oTR;
+			cQ++; cR++; cS++; cT++;
+			if (cQ > dpQ) cQ = 0;
+			if (cR > dpR) cR = 0;
+			if (cS > dpS) cS = 0;
+			if (cT > dpT) cT = 0;
+			oQL = asFloat32(multiplyAdd(oQL,0.5,lQ[cQ]));
+			oRL = asFloat32(multiplyAdd(oRL,0.5,lR[cR]));
+			oSL = asFloat32(multiplyAdd(oSL,0.5,lS[cS]));
+			oTL = asFloat32(multiplyAdd(oTL,0.0,lT[cT])); 
+			oQR = asFloat32(multiplyAdd(oQR,0.5,rQ[cQ]));
+			oRR = asFloat32(multiplyAdd(oRR,0.5,rR[cR]));
+			oSR = asFloat32(multiplyAdd(oSR,0.5,rS[cS]));
+			oTR = asFloat32(multiplyAdd(oTR,0.0,rT[cT])); 
+			
+			if (bypassPre) {oQL = asFloat32(inputSampleL); oQR = asFloat32(inputSampleR);} 
+			
+			lA[cA] = multiplyAdd(fAL,damping,oQL);
+			lB[cB] = multiplyAdd(fBL,damping,oQL);
+			lC[cC] = multiplyAdd(fCL,damping,oQL);
+			lD[cD] = multiplyAdd(fDL,damping,oQL);
+			rA[cA] = multiplyAdd(fAR,damping,oQR);
+			rB[cB] = multiplyAdd(fBR,damping,oQR);
+			rC[cC] = multiplyAdd(fCR,damping,oQR);
+			rD[cD] = multiplyAdd(fDR,damping,oQR);
+			cA++; cB++; cC++; cD++;
+			if (cA > d4A) cA = 0;
+			if (cB > d4B) cB = 0;
+			if (cC > d4C) cC = 0;
+			if (cD > d4D) cD = 0;
+			hAL = asFloat32(lA[cA]); hBL = asFloat32(lB[cB]); hCL = asFloat32(lC[cC]); hDL = asFloat32(lD[cD]);
+			hAR = asFloat32(rA[cA]); hBR = asFloat32(rB[cB]); hCR = asFloat32(rC[cC]); hDR = asFloat32(rD[cD]);
+			hEL = asFloat32(-(hAL + hBL + hCL + hDL));
+			hER = asFloat32(-(hAR + hBR + hCR + hDR));
+			lE[cE] = multiplyAdd(hAL,2.0,hEL);
+			lF[cF] = multiplyAdd(hBL,2.0,hEL);
+			lG[cG] = multiplyAdd(hCL,2.0,hEL);
+			lH[cH] = multiplyAdd(hDL,2.0,hEL);
+			rE[cE] = multiplyAdd(hAR,2.0,hER);
+			rF[cF] = multiplyAdd(hBR,2.0,hER);
+			rG[cG] = multiplyAdd(hCR,2.0,hER);
+			rH[cH] = multiplyAdd(hDR,2.0,hER);
+			cE++; cF++; cG++; cH++;
+			if (cE > d4E) cE = 0;
+			if (cF > d4F) cF = 0;
+			if (cG > d4G) cG = 0;
+			if (cH > d4H) cH = 0;
+			hAL = asFloat32(lE[cE]); hBL = asFloat32(lF[cF]); hCL = asFloat32(lG[cG]); hDL = asFloat32(lH[cH]);
+			hAR = asFloat32(rE[cE]); hBR = asFloat32(rF[cF]); hCR = asFloat32(rG[cG]); hDR = asFloat32(rH[cH]);
+			hEL = asFloat32(-(hAL + hBL + hCL + hDL));
+			hER = asFloat32(-(hAR + hBR + hCR + hDR));
+			lI[cI] = multiplyAdd(hAL,2.0,hEL);
+			lJ[cJ] = multiplyAdd(hBL,2.0,hEL);
+			lK[cK] = multiplyAdd(hCL,2.0,hEL);
+			lL[cL] = multiplyAdd(hDL,2.0,hEL);
+			rI[cI] = multiplyAdd(hAR,2.0,hER);
+			rJ[cJ] = multiplyAdd(hBR,2.0,hER);
+			rK[cK] = multiplyAdd(hCR,2.0,hER);
+			rL[cL] = multiplyAdd(hDR,2.0,hER);
+			cI++; cJ++; cK++; cL++;
+			if (cI > d4I) cI = 0;
+			if (cJ > d4J) cJ = 0;
+			if (cK > d4K) cK = 0;
+			if (cL > d4L) cL = 0;
+			hAL = asFloat32(lI[cI]); hBL = asFloat32(lJ[cJ]); hCL = asFloat32(lK[cK]); hDL = asFloat32(lL[cL]);
+			hAR = asFloat32(rI[cI]); hBR = asFloat32(rJ[cJ]); hCR = asFloat32(rK[cK]); hDR = asFloat32(rL[cL]);
+			hEL = asFloat32(-(hAL + hBL + hCL + hDL));
+			hER = asFloat32(-(hAR + hBR + hCR + hDR));
+			lM[cM] = multiplyAdd(hAL,2.0,hEL);
+			lN[cN] = multiplyAdd(hBL,2.0,hEL);
+			lO[cO] = multiplyAdd(hCL,2.0,hEL);
+			lP[cP] = multiplyAdd(hDL,2.0,hEL);
+			rM[cM] = multiplyAdd(hAR,2.0,hER);
+			rN[cN] = multiplyAdd(hBR,2.0,hER);
+			rO[cO] = multiplyAdd(hCR,2.0,hER);
+			rP[cP] = multiplyAdd(hDR,2.0,hER);
+			cM++; cN++; cO++; cP++;
+			if (cM > d4M) cM = 0;
+			if (cN > d4N) cN = 0;
+			if (cO > d4O) cO = 0;
+			if (cP > d4P) cP = 0;
+			hAL = asFloat32(lM[cM]); hBL = asFloat32(lN[cN]); hCL = asFloat32(lO[cO]); hDL = asFloat32(lP[cP]);
+			hAR = asFloat32(rM[cM]); hBR = asFloat32(rN[cN]); hCR = asFloat32(rO[cO]); hDR = asFloat32(rP[cP]);
+			hEL = asFloat32(-(hAL + hBL + hCL + hDL));
+			hER = asFloat32(-(hAR + hBR + hCR + hDR));
+			fAL = asFloat32(multiplyAdd(hAL,2.0,hEL));				
+			fBL = asFloat32(multiplyAdd(hBL,2.0,hEL));
+			fCL = asFloat32(multiplyAdd(hCL,2.0,hEL));
+			fDL = asFloat32(multiplyAdd(hDL,2.0,hEL));
+			fAR = asFloat32(multiplyAdd(hAR,2.0,hER));				
+			fBR = asFloat32(multiplyAdd(hBR,2.0,hER));
+			fCR = asFloat32(multiplyAdd(hCR,2.0,hER));
+			fDR = asFloat32(multiplyAdd(hDR,2.0,hER));
+			switch (unSolid)
+			{
+				case 0:
+					fhAL = asFloat32(fhAL * (0.25)); fAL = asFloat32(fAL - (fhAL*0.125)); fhAL = asFloat32(fhAL + (fAL));
+					fhAR = asFloat32(fhAR * (0.25)); fAR = asFloat32(fAR - (fhAR*0.125)); fhAR = asFloat32(fhAR + (fAR));
+				case 1:
+					fhBL = asFloat32(fhBL * (0.25)); fBL = asFloat32(fBL - (fhBL*0.125)); fhBL = asFloat32(fhBL + (fBL));
+					fhBR = asFloat32(fhBR * (0.25)); fBR = asFloat32(fBR - (fhBR*0.125)); fhBR = asFloat32(fhBR + (fBR));
+				case 2:
+					fhCL = asFloat32(fhCL * (0.25)); fCL = asFloat32(fCL - (fhCL*0.125)); fhCL = asFloat32(fhCL + (fCL));
+					fhCR = asFloat32(fhCR * (0.25)); fCR = asFloat32(fCR - (fhCR*0.125)); fhCR = asFloat32(fhCR + (fCR));
+				case 3:
+					fhDL = asFloat32(fhDL * (0.25)); fDL = asFloat32(fDL - (fhDL*0.125)); fhDL = asFloat32(fhDL + (fDL));
+					fhDR = asFloat32(fhDR * (0.25)); fDR = asFloat32(fDR - (fhDR*0.125)); fhDR = asFloat32(fhDR + (fDR));
+				case 4:
+					break;
+			}
+			switch (unReflect)
+			{
+				case 0:
+					fDL = asFloat32((fDL+flDL)*0.5); flDL = asFloat32(fDL);
+					fDR = asFloat32((fDR+flDR)*0.5); flDR = asFloat32(fDR);
+				case 1:
+					fCL = asFloat32((fCL+flCL)*0.5); flCL = asFloat32(fCL);
+					fCR = asFloat32((fCR+flCR)*0.5); flCR = asFloat32(fCR);
+				case 2:
+					fBL = asFloat32((fBL+flBL)*0.5); flBL = asFloat32(fBL);
+					fBR = asFloat32((fBR+flBR)*0.5); flBR = asFloat32(fBR);
+				case 3:
+					fAL = asFloat32((fAL+flAL)*0.5); flAL = asFloat32(fAL);
+					fAR = asFloat32((fAR+flAR)*0.5); flAR = asFloat32(fAR);
+				case 4:
+					break;
+			}
+			inputSampleL = asFloat32((hAL + hBL + hCL + hDL)*0.0625);
+			inputSampleR = asFloat32((hAR + hBR + hCR + hDR)*0.0625);
+
+			if (bypassVerb) {inputSampleL = asFloat32(oQL); inputSampleR = asFloat32(oQR);} 
+			
+			inputSampleL = asFloat32((inputSampleL * wet)+(drySampleL * (1.0-wet)));
+			inputSampleR = asFloat32((inputSampleR * wet)+(drySampleR * (1.0-wet)));
+
+			firstDryL = asFloat32(inputSampleL); 
+			inputSampleL = asFloat32(inputSampleL + (firstAvgL)); inputSampleL = asFloat32(inputSampleL * (0.5)); firstAvgL = asFloat32(inputSampleL);
+			inputSampleL = asFloat32((firstDryL*(1.0-distance)) + (inputSampleL*distance));
+			
+			if (prevDistance < distanceSteps) {
+				switch (prevDistance)
+				{
+					case  0: lsA = asFloat32(inputSampleL); 
+					case  1: lsB = asFloat32(inputSampleL); 
+					case  2: lsC = asFloat32(inputSampleL); 
+					case  3: lsD = asFloat32(inputSampleL); 
+					case  4: lsE = asFloat32(inputSampleL); 
+					case  5: lsF = asFloat32(inputSampleL); 
+					case  6: lsG = asFloat32(inputSampleL); 
+					case  7: lsH = asFloat32(inputSampleL);
+					case  8: lsI = asFloat32(inputSampleL);
+					case  9: lsJ = asFloat32(inputSampleL);
+					case 10: lsK = asFloat32(inputSampleL);
+					case 11: lsL = asFloat32(inputSampleL);
+					case 12: lsM = asFloat32(inputSampleL);
+					case 13: lsN = asFloat32(inputSampleL);
+					case 14: lsO = asFloat32(inputSampleL);
+					case 15: lsP = asFloat32(inputSampleL);
+					case 16: lsQ = asFloat32(inputSampleL);
+					case 17: lsR = asFloat32(inputSampleL);
+					case 18: lsS = asFloat32(inputSampleL);
+					case 19: lsT = asFloat32(inputSampleL);
+					case 20: lsU = asFloat32(inputSampleL);
+					case 21: lsV = asFloat32(inputSampleL);
+					case 22: lsW = asFloat32(inputSampleL);
+					case 23: lsX = asFloat32(inputSampleL);
+					case 24: lsY = asFloat32(inputSampleL);
+					case 25: lsZ = asFloat32(inputSampleL);
+					case 26: lsa = asFloat32(inputSampleL);
+					case 27: lsb = asFloat32(inputSampleL);
+					case 28: lsc = asFloat32(inputSampleL);
+					case 29: lsd = asFloat32(inputSampleL);
+					case 30: lse = asFloat32(inputSampleL);
+					case 31: lsf = asFloat32(inputSampleL);
+					case 32: lsg = asFloat32(inputSampleL);
+					case 33: lsh = asFloat32(inputSampleL);
+					case 34: lsi = asFloat32(inputSampleL);
+					case 35: lsj = asFloat32(inputSampleL);
+					case 36: lsk = asFloat32(inputSampleL);
+					case 37: lsl = asFloat32(inputSampleL);
+					case 38: lsm = asFloat32(inputSampleL);
+					case 39: lsn = asFloat32(inputSampleL);
+					case 40: lso = asFloat32(inputSampleL);
+					case 41: lsp = asFloat32(inputSampleL);
+					case 42: lsq = asFloat32(inputSampleL);
+					case 43: lsr = asFloat32(inputSampleL);
+					case 44: lss = asFloat32(inputSampleL);
+					case 45: lst = asFloat32(inputSampleL);
+					case 46: lsu = asFloat32(inputSampleL);
+					case 47: lsv = asFloat32(inputSampleL);
+					case 48: lsw = asFloat32(inputSampleL);
+					case 49: lsx = asFloat32(inputSampleL);
+					case 50: lsy = asFloat32(inputSampleL);
+					case 51: lsz = asFloat32(inputSampleL);
+					case 52: break; 
+				}
+			}
+			switch (52-distanceSteps)
+			{ 
+				case  0: inputSampleL = asFloat32(inputSampleL + (lsz)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsz = asFloat32(inputSampleL);
+				case  1: inputSampleL = asFloat32(inputSampleL + (lsy)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsy = asFloat32(inputSampleL);
+				case  2: inputSampleL = asFloat32(inputSampleL + (lsx)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsx = asFloat32(inputSampleL);
+				case  3: inputSampleL = asFloat32(inputSampleL + (lsw)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsw = asFloat32(inputSampleL);
+				case  4: inputSampleL = asFloat32(inputSampleL + (lsv)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsv = asFloat32(inputSampleL);
+				case  5: inputSampleL = asFloat32(inputSampleL + (lsu)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsu = asFloat32(inputSampleL);
+				case  6: inputSampleL = asFloat32(inputSampleL + (lst)); inputSampleL = asFloat32(inputSampleL * (0.5)); lst = asFloat32(inputSampleL);
+				case  7: inputSampleL = asFloat32(inputSampleL + (lss)); inputSampleL = asFloat32(inputSampleL * (0.5)); lss = asFloat32(inputSampleL);
+				case  8: inputSampleL = asFloat32(inputSampleL + (lsr)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsr = asFloat32(inputSampleL);
+				case  9: inputSampleL = asFloat32(inputSampleL + (lsq)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsq = asFloat32(inputSampleL);
+				case 10: inputSampleL = asFloat32(inputSampleL + (lsp)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsp = asFloat32(inputSampleL);
+				case 11: inputSampleL = asFloat32(inputSampleL + (lso)); inputSampleL = asFloat32(inputSampleL * (0.5)); lso = asFloat32(inputSampleL);
+				case 12: inputSampleL = asFloat32(inputSampleL + (lsn)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsn = asFloat32(inputSampleL);
+				case 13: inputSampleL = asFloat32(inputSampleL + (lsm)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsm = asFloat32(inputSampleL);
+				case 14: inputSampleL = asFloat32(inputSampleL + (lsl)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsl = asFloat32(inputSampleL);
+				case 15: inputSampleL = asFloat32(inputSampleL + (lsk)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsk = asFloat32(inputSampleL);
+				case 16: inputSampleL = asFloat32(inputSampleL + (lsj)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsj = asFloat32(inputSampleL);
+				case 17: inputSampleL = asFloat32(inputSampleL + (lsi)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsi = asFloat32(inputSampleL);
+				case 18: inputSampleL = asFloat32(inputSampleL + (lsh)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsh = asFloat32(inputSampleL);
+				case 19: inputSampleL = asFloat32(inputSampleL + (lsg)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsg = asFloat32(inputSampleL);
+				case 20: inputSampleL = asFloat32(inputSampleL + (lsf)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsf = asFloat32(inputSampleL);
+				case 21: inputSampleL = asFloat32(inputSampleL + (lse)); inputSampleL = asFloat32(inputSampleL * (0.5)); lse = asFloat32(inputSampleL);
+				case 22: inputSampleL = asFloat32(inputSampleL + (lsd)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsd = asFloat32(inputSampleL);
+				case 23: inputSampleL = asFloat32(inputSampleL + (lsc)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsc = asFloat32(inputSampleL);
+				case 24: inputSampleL = asFloat32(inputSampleL + (lsb)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsb = asFloat32(inputSampleL);
+				case 25: inputSampleL = asFloat32(inputSampleL + (lsa)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsa = asFloat32(inputSampleL);
+				case 26: inputSampleL = asFloat32(inputSampleL + (lsZ)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsZ = asFloat32(inputSampleL);
+				case 27: inputSampleL = asFloat32(inputSampleL + (lsY)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsY = asFloat32(inputSampleL);
+				case 28: inputSampleL = asFloat32(inputSampleL + (lsX)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsX = asFloat32(inputSampleL);
+				case 29: inputSampleL = asFloat32(inputSampleL + (lsW)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsW = asFloat32(inputSampleL);
+				case 30: inputSampleL = asFloat32(inputSampleL + (lsV)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsV = asFloat32(inputSampleL);
+				case 31: inputSampleL = asFloat32(inputSampleL + (lsU)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsU = asFloat32(inputSampleL);
+				case 32: inputSampleL = asFloat32(inputSampleL + (lsT)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsT = asFloat32(inputSampleL);
+				case 33: inputSampleL = asFloat32(inputSampleL + (lsS)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsS = asFloat32(inputSampleL);
+				case 34: inputSampleL = asFloat32(inputSampleL + (lsR)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsR = asFloat32(inputSampleL);
+				case 35: inputSampleL = asFloat32(inputSampleL + (lsQ)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsQ = asFloat32(inputSampleL);
+				case 36: inputSampleL = asFloat32(inputSampleL + (lsP)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsP = asFloat32(inputSampleL);
+				case 37: inputSampleL = asFloat32(inputSampleL + (lsO)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsO = asFloat32(inputSampleL);
+				case 38: inputSampleL = asFloat32(inputSampleL + (lsN)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsN = asFloat32(inputSampleL);
+				case 39: inputSampleL = asFloat32(inputSampleL + (lsM)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsM = asFloat32(inputSampleL);
+				case 40: inputSampleL = asFloat32(inputSampleL + (lsL)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsL = asFloat32(inputSampleL);
+				case 41: inputSampleL = asFloat32(inputSampleL + (lsK)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsK = asFloat32(inputSampleL);
+				case 42: inputSampleL = asFloat32(inputSampleL + (lsJ)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsJ = asFloat32(inputSampleL);
+				case 43: inputSampleL = asFloat32(inputSampleL + (lsI)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsI = asFloat32(inputSampleL);
+				case 44: inputSampleL = asFloat32(inputSampleL + (lsH)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsH = asFloat32(inputSampleL);
+				case 45: inputSampleL = asFloat32(inputSampleL + (lsG)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsG = asFloat32(inputSampleL);
+				case 46: inputSampleL = asFloat32(inputSampleL + (lsF)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsF = asFloat32(inputSampleL);
+				case 47: inputSampleL = asFloat32(inputSampleL + (lsE)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsE = asFloat32(inputSampleL);
+				case 48: inputSampleL = asFloat32(inputSampleL + (lsD)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsD = asFloat32(inputSampleL);
+				case 49: inputSampleL = asFloat32(inputSampleL + (lsC)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsC = asFloat32(inputSampleL);
+				case 50: inputSampleL = asFloat32(inputSampleL + (lsB)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsB = asFloat32(inputSampleL);
+				case 51: inputSampleL = asFloat32(inputSampleL + (lsA)); inputSampleL = asFloat32(inputSampleL * (0.5)); lsA = asFloat32(inputSampleL);
+				case 52: break;
+			}
+
+			firstDryR = asFloat32(inputSampleR); 
+			inputSampleR = asFloat32(inputSampleR + (firstAvgR)); inputSampleR = asFloat32(inputSampleR * (0.5)); firstAvgR = asFloat32(inputSampleR);
+			inputSampleR = asFloat32((firstDryR*(1.0-distance)) + (inputSampleR*distance));
+			
+			if (prevDistance < distanceSteps) {
+				switch (prevDistance)
+				{
+					case  0: rsA = asFloat32(inputSampleR); 
+					case  1: rsB = asFloat32(inputSampleR); 
+					case  2: rsC = asFloat32(inputSampleR); 
+					case  3: rsD = asFloat32(inputSampleR); 
+					case  4: rsE = asFloat32(inputSampleR); 
+					case  5: rsF = asFloat32(inputSampleR); 
+					case  6: rsG = asFloat32(inputSampleR); 
+					case  7: rsH = asFloat32(inputSampleR);
+					case  8: rsI = asFloat32(inputSampleR);
+					case  9: rsJ = asFloat32(inputSampleR);
+					case 10: rsK = asFloat32(inputSampleR);
+					case 11: rsL = asFloat32(inputSampleR);
+					case 12: rsM = asFloat32(inputSampleR);
+					case 13: rsN = asFloat32(inputSampleR);
+					case 14: rsO = asFloat32(inputSampleR);
+					case 15: rsP = asFloat32(inputSampleR);
+					case 16: rsQ = asFloat32(inputSampleR);
+					case 17: rsR = asFloat32(inputSampleR);
+					case 18: rsS = asFloat32(inputSampleR);
+					case 19: rsT = asFloat32(inputSampleR);
+					case 20: rsU = asFloat32(inputSampleR);
+					case 21: rsV = asFloat32(inputSampleR);
+					case 22: rsW = asFloat32(inputSampleR);
+					case 23: rsX = asFloat32(inputSampleR);
+					case 24: rsY = asFloat32(inputSampleR);
+					case 25: rsZ = asFloat32(inputSampleR);
+					case 26: rsa = asFloat32(inputSampleR);
+					case 27: rsb = asFloat32(inputSampleR);
+					case 28: rsc = asFloat32(inputSampleR);
+					case 29: rsd = asFloat32(inputSampleR);
+					case 30: rse = asFloat32(inputSampleR);
+					case 31: rsf = asFloat32(inputSampleR);
+					case 32: rsg = asFloat32(inputSampleR);
+					case 33: rsh = asFloat32(inputSampleR);
+					case 34: rsi = asFloat32(inputSampleR);
+					case 35: rsj = asFloat32(inputSampleR);
+					case 36: rsk = asFloat32(inputSampleR);
+					case 37: rsl = asFloat32(inputSampleR);
+					case 38: rsm = asFloat32(inputSampleR);
+					case 39: rsn = asFloat32(inputSampleR);
+					case 40: rso = asFloat32(inputSampleR);
+					case 41: rsp = asFloat32(inputSampleR);
+					case 42: rsq = asFloat32(inputSampleR);
+					case 43: rsr = asFloat32(inputSampleR);
+					case 44: rss = asFloat32(inputSampleR);
+					case 45: rst = asFloat32(inputSampleR);
+					case 46: rsu = asFloat32(inputSampleR);
+					case 47: rsv = asFloat32(inputSampleR);
+					case 48: rsw = asFloat32(inputSampleR);
+					case 49: rsx = asFloat32(inputSampleR);
+					case 50: rsy = asFloat32(inputSampleR);
+					case 51: rsz = asFloat32(inputSampleR);
+					case 52: prevDistance = distanceSteps;
+				}
+			}
+			switch (52-distanceSteps)
+			{ 
+				case  0: inputSampleR = asFloat32(inputSampleR + (rsz)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsz = asFloat32(inputSampleR);
+				case  1: inputSampleR = asFloat32(inputSampleR + (rsy)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsy = asFloat32(inputSampleR);
+				case  2: inputSampleR = asFloat32(inputSampleR + (rsx)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsx = asFloat32(inputSampleR);
+				case  3: inputSampleR = asFloat32(inputSampleR + (rsw)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsw = asFloat32(inputSampleR);
+				case  4: inputSampleR = asFloat32(inputSampleR + (rsv)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsv = asFloat32(inputSampleR);
+				case  5: inputSampleR = asFloat32(inputSampleR + (rsu)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsu = asFloat32(inputSampleR);
+				case  6: inputSampleR = asFloat32(inputSampleR + (rst)); inputSampleR = asFloat32(inputSampleR * (0.5)); rst = asFloat32(inputSampleR);
+				case  7: inputSampleR = asFloat32(inputSampleR + (rss)); inputSampleR = asFloat32(inputSampleR * (0.5)); rss = asFloat32(inputSampleR);
+				case  8: inputSampleR = asFloat32(inputSampleR + (rsr)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsr = asFloat32(inputSampleR);
+				case  9: inputSampleR = asFloat32(inputSampleR + (rsq)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsq = asFloat32(inputSampleR);
+				case 10: inputSampleR = asFloat32(inputSampleR + (rsp)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsp = asFloat32(inputSampleR);
+				case 11: inputSampleR = asFloat32(inputSampleR + (rso)); inputSampleR = asFloat32(inputSampleR * (0.5)); rso = asFloat32(inputSampleR);
+				case 12: inputSampleR = asFloat32(inputSampleR + (rsn)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsn = asFloat32(inputSampleR);
+				case 13: inputSampleR = asFloat32(inputSampleR + (rsm)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsm = asFloat32(inputSampleR);
+				case 14: inputSampleR = asFloat32(inputSampleR + (rsl)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsl = asFloat32(inputSampleR);
+				case 15: inputSampleR = asFloat32(inputSampleR + (rsk)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsk = asFloat32(inputSampleR);
+				case 16: inputSampleR = asFloat32(inputSampleR + (rsj)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsj = asFloat32(inputSampleR);
+				case 17: inputSampleR = asFloat32(inputSampleR + (rsi)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsi = asFloat32(inputSampleR);
+				case 18: inputSampleR = asFloat32(inputSampleR + (rsh)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsh = asFloat32(inputSampleR);
+				case 19: inputSampleR = asFloat32(inputSampleR + (rsg)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsg = asFloat32(inputSampleR);
+				case 20: inputSampleR = asFloat32(inputSampleR + (rsf)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsf = asFloat32(inputSampleR);
+				case 21: inputSampleR = asFloat32(inputSampleR + (rse)); inputSampleR = asFloat32(inputSampleR * (0.5)); rse = asFloat32(inputSampleR);
+				case 22: inputSampleR = asFloat32(inputSampleR + (rsd)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsd = asFloat32(inputSampleR);
+				case 23: inputSampleR = asFloat32(inputSampleR + (rsc)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsc = asFloat32(inputSampleR);
+				case 24: inputSampleR = asFloat32(inputSampleR + (rsb)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsb = asFloat32(inputSampleR);
+				case 25: inputSampleR = asFloat32(inputSampleR + (rsa)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsa = asFloat32(inputSampleR);
+				case 26: inputSampleR = asFloat32(inputSampleR + (rsZ)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsZ = asFloat32(inputSampleR);
+				case 27: inputSampleR = asFloat32(inputSampleR + (rsY)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsY = asFloat32(inputSampleR);
+				case 28: inputSampleR = asFloat32(inputSampleR + (rsX)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsX = asFloat32(inputSampleR);
+				case 29: inputSampleR = asFloat32(inputSampleR + (rsW)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsW = asFloat32(inputSampleR);
+				case 30: inputSampleR = asFloat32(inputSampleR + (rsV)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsV = asFloat32(inputSampleR);
+				case 31: inputSampleR = asFloat32(inputSampleR + (rsU)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsU = asFloat32(inputSampleR);
+				case 32: inputSampleR = asFloat32(inputSampleR + (rsT)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsT = asFloat32(inputSampleR);
+				case 33: inputSampleR = asFloat32(inputSampleR + (rsS)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsS = asFloat32(inputSampleR);
+				case 34: inputSampleR = asFloat32(inputSampleR + (rsR)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsR = asFloat32(inputSampleR);
+				case 35: inputSampleR = asFloat32(inputSampleR + (rsQ)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsQ = asFloat32(inputSampleR);
+				case 36: inputSampleR = asFloat32(inputSampleR + (rsP)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsP = asFloat32(inputSampleR);
+				case 37: inputSampleR = asFloat32(inputSampleR + (rsO)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsO = asFloat32(inputSampleR);
+				case 38: inputSampleR = asFloat32(inputSampleR + (rsN)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsN = asFloat32(inputSampleR);
+				case 39: inputSampleR = asFloat32(inputSampleR + (rsM)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsM = asFloat32(inputSampleR);
+				case 40: inputSampleR = asFloat32(inputSampleR + (rsL)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsL = asFloat32(inputSampleR);
+				case 41: inputSampleR = asFloat32(inputSampleR + (rsK)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsK = asFloat32(inputSampleR);
+				case 42: inputSampleR = asFloat32(inputSampleR + (rsJ)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsJ = asFloat32(inputSampleR);
+				case 43: inputSampleR = asFloat32(inputSampleR + (rsI)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsI = asFloat32(inputSampleR);
+				case 44: inputSampleR = asFloat32(inputSampleR + (rsH)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsH = asFloat32(inputSampleR);
+				case 45: inputSampleR = asFloat32(inputSampleR + (rsG)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsG = asFloat32(inputSampleR);
+				case 46: inputSampleR = asFloat32(inputSampleR + (rsF)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsF = asFloat32(inputSampleR);
+				case 47: inputSampleR = asFloat32(inputSampleR + (rsE)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsE = asFloat32(inputSampleR);
+				case 48: inputSampleR = asFloat32(inputSampleR + (rsD)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsD = asFloat32(inputSampleR);
+				case 49: inputSampleR = asFloat32(inputSampleR + (rsC)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsC = asFloat32(inputSampleR);
+				case 50: inputSampleR = asFloat32(inputSampleR + (rsB)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsB = asFloat32(inputSampleR);
+				case 51: inputSampleR = asFloat32(inputSampleR + (rsA)); inputSampleR = asFloat32(inputSampleR * (0.5)); rsA = asFloat32(inputSampleR);
+				case 52: break;
+			}
+
+			pointAL = asFloat32(pointBL);
+			pointBL = asFloat32(inputSampleL);
+			pointAR = asFloat32(pointBR);
+			pointBR = asFloat32(inputSampleR);
+			pointCycle = asFloat32(0.0); 
+
+		}
+		inputSampleL = asFloat32(pointAL+((pointBL-pointAL)*pointCycle));
+		inputSampleR = asFloat32(pointAR+((pointBR-pointAR)*pointCycle));
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+		if (unsigned32(fpdL-fpdR) < 1073741824 || unsigned32(fpdR-fpdL) < 1073741824) {
+			fpdR = advanceRandom(fpdR);}
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

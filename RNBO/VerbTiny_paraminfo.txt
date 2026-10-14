@@ -1,0 +1,46 @@
+VerbTiny — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/verbtiny/
+
+What it is: an ultra-low-CPU artificial reverb built from a specially
+evolved 4x4 matrix, meant to merge with the sound and change its texture
+(that "tssshhh" of a naive digital reverb, in a good way) rather than to
+simulate a physical room. Intentionally "old school". This RNBO port uses
+the original normalized 0..1 values.
+
+Parameters:
+
+- p_replace (Replace) 0..1, default 0.5
+  Regeneration: the Galactic-style "replace" control. Above 0 it replaces
+  incoming dry signal with already-reverberated signal in the feedback
+  path, so the tail is "refilled" with the mixture. Lower values sound
+  like a light small room; the high end gets dense/ringy washes. Do not
+  push too hard: unlike your complex DSP reverb, at >0.9 it can saturate.
+
+- p_derez (Derez) 0..1, default 1.0
+  Darkens the reverb through a Bezier undersampling: it is a sample-rate
+  style reduction, not a normal filter - at higher values the wet
+  becomes "aliased-ish", "grittier", like a digital early digital reverb.
+  Default 1.0 is full effect without extra undersampling artifacts
+  (1.0 = no reduction; lowering it starts the dull and washed sound).
+
+- p_filter (Filter) 0..1, default 1.0
+  Tone of the wet reverb via a Bezier filter. 1.0 = brightest; lowering
+  makes a smooth tonal (not just lowpass) darker "muffled room".
+  Pairs with Derez for that old-school muddy-to-hi-fi scale.
+
+- p_wider (Wider) 0..1, default 0.0
+  Stereo image of the wet signal, with a few discrete worlds:
+  0.0-0.5 blends the normal narrow stereo reverb with a dual-mono variant
+  (richer, weirder mid-image "unnatural wideness" around 0.5);
+  0.5-1.0 then transitions into a HYPER-wide opposite-phase variant.
+  Try stops at 0.3, 0.5, 0.7 and listen for the mids changing shape
+  before the overall width does.
+
+- p_drywet (Dry/Wet) 0..1, default 1.0
+  Normal linear dry/wet blend (1.0 = full wet return).
+
+Musical notes: put on a return for dub/techno "big tssshhh", or on single
+tracks where you want the verb to melt into the tone. The Wider control is
+the character knob: avoid 0.5 exactly if you want natural stereo.
+Note: Trash (the VerbThic sibling) shares the same 5 controls but is
+a different - denser, stubbier - matrix: see VerbThic.

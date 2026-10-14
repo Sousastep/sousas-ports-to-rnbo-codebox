@@ -1,0 +1,34 @@
+ButterComp2 — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/buttercomp2/
+
+What it is: the Airwindows "Butter" compressor - an extremely squishy,
+dark, vintage-feeling feedback compressor with no threshold/ratio/attack
+knobs. Everything is driven by an input gain. Gain-cell slopes are quadratic
+on the signal itself, so gain reduction follows the actual peak shape of the
+audio instead of an exact multiplication; the makeup gain is nonlinear, so
+the depth of compression is baked into the audio rather than calculated.
+This RNBO port uses the original normalized 0..1 values.
+
+Parameters:
+
+- p_compress (Compress) 0..1, default 0.0
+  One knob: simultaneously input drive and feedback depth. Internally maps
+  to +14 dB input gain at max (pow(10, p*14/20)) with audio-dependent
+  feedback. Rough guides:
+  0.0-0.2   barely compresses (0 = bypass-ish, unity drive)
+  0.4-0.5   vintage "glue", pumping but musical
+  0.9-1.0   extreme limiting / pushes almost everything to a squashed mean
+  Nearly linear feel: each 0.1 up ≈ +1.4 dB drive. Default 0 means mostly
+  unused unless you push the knob.
+
+- p_output (Output) 0..1, default 0.5
+  Output trim, internally output * pow(2,p*2-1)... implemented as output*2
+  with p 0..1, so 0.5 = unity, 0 = -6 dB-like, 1 = +6 dB-like. Linear taper.
+
+- p_drywet (Dry/Wet) 0..1, default 1.0
+  Plain linear mix of compressed and dry signal (1.0 = full wet).
+
+Musical notes: put on the drum buss, rock out the Compress knob until it
+pumps, then ride Output for level. The buttery "bloom" comes from the
+nonlinear makeup gain; with parallel compression use the Dry/Wet for
+transient retention rather than trying to replace the compressed texture entirely.

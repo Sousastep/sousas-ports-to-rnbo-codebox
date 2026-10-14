@@ -1,0 +1,34 @@
+ZOutputStage — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/zoutputstage/
+
+What it is: the output clipping/tone stage shared by the Emu e6400-flavored
+"Z" filters, as a standalone saturator: an insane-degree.input-staged
+fourth-power gain trim into a k-style soft clipper, followed by fixed
+15.5 kHz op-amp-style ultrasonic filters. Cleaner and simpler than
+ZAcidLowpass: no filter, no resonance, just the Z distortion/tone stage.
+This RNBO port uses the original normalized 0..1 values and the same fixed
+15.5 kHz filters, so use sample rates ABOVE 31 kHz (README note).
+
+Parameters:
+
+- p_input (Input) 0..1, default 0.1
+  Drive into the Z distortion stage. Internally (p*10)^4, so 0.1 is
+  roughly unity and the same DRIVE mapping as the Z filters, for x10000
+  (+80 dB) at max - huge, steep taper. Start at or below the default and
+  raise slowly.
+
+- p_output (Output) 0..1, default 1.0
+  Output pad (outPad = p_output, linear). Use it, not Input, to set
+  final level after the distortion.
+
+No other parameters:
+
+- (none)
+  Fixed internal 15.5 kHz ultrasonic filtering (two biquads) rooms out
+  the floppy aliasing the distortion would otherwise generate. This is
+  the "weight/tone" family smell of the Z filters, not a mix knob.
+
+Musical notes: use on single tracks (bass, drums, synths) as an aggressive
+saturator that you can push from subtle to wildly broken. Because the
+input mapping is fourth-power, small moves near the default have large
+audible effect - push gently and A/B at equal levels with Output.

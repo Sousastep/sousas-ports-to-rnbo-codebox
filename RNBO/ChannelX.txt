@@ -1,0 +1,364 @@
+/* ChannelX — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Console Type
+@param({ min: 0, max: 1 }) p_consoletype = 0.0;
+// VST B: Drive
+@param({ min: 0, max: 1 }) p_drive = 0.0;
+// VST C: Output
+@param({ min: 0, max: 1 }) p_output = 1.0;
+
+const bip_dvLA = 0;
+const bip_dvLB = 1;
+const bip_dvLC = 2;
+const bip_dvLD = 3;
+const bip_pvLA = 4;
+const bip_pvLB = 5;
+const bip_pvLC = 6;
+const bip_pvLD = 7;
+const bip_dvRA = 8;
+const bip_dvRB = 9;
+const bip_dvRC = 10;
+const bip_dvRD = 11;
+const bip_pvRA = 12;
+const bip_pvRB = 13;
+const bip_pvRC = 14;
+const bip_pvRD = 15;
+const bip_drbLA = 16;
+const bip_drbLB = 17;
+const bip_drbLC = 18;
+const bip_drbLD = 19;
+const bip_praLA = 20;
+const bip_praLB = 21;
+const bip_praLC = 22;
+const bip_praLD = 23;
+const bip_prbLA = 24;
+const bip_prbLB = 25;
+const bip_prbLC = 26;
+const bip_prbLD = 27;
+const bip_drbRA = 28;
+const bip_drbRB = 29;
+const bip_drbRC = 30;
+const bip_drbRD = 31;
+const bip_praRA = 32;
+const bip_praRB = 33;
+const bip_praRC = 34;
+const bip_praRD = 35;
+const bip_prbRA = 36;
+const bip_prbRB = 37;
+const bip_prbRC = 38;
+const bip_prbRD = 39;
+const bip_total = 40;
+@state rbSampleLA = 0;
+@state rbSampleRA = 0;
+@state rbSampleLB = 0;
+@state rbSampleRB = 0;
+@state lastSampleLA = 0;
+@state lastSampleLB = 0;
+@state lastSampleLC = 0;
+@state lastSampleRA = 0;
+@state lastSampleRB = 0;
+@state lastSampleRC = 0;
+@state flip = 0;
+@state bip = new FixedFloat64Array(bip_total);
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state density = 0;
+@state phattity = 0;
+@state nonLin = 0;
+@state output = 0;
+@state rbAmount = 0;
+@state threshold = 0;
+@state consoleType: Int = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+// RNBO has no fused multiply-add operator; preserve the equation.
+function multiplyAdd(a, b, c) { return a * b + c; }
+
+function init() {
+
+	rbSampleLA = 0.0;
+	rbSampleRA = 0.0;
+	rbSampleLB = 0.0;
+	rbSampleRB = 0.0;
+	lastSampleLA = lastSampleLB = lastSampleLC = 0.0;
+	lastSampleRA = lastSampleRB = lastSampleRC = 0.0;
+	flip = 0;
+	for (let x: Int = 0; x < bip_total; x++) bip[x] = 0.0;
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 1.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();	
+	density = p_drive*2.0; 
+	phattity = density - 1.0;
+	if (density > 1.0) density = 1.0; 
+	if (phattity < 0.0) phattity = 0.0; 
+	nonLin = 5.0-density; 
+	output = p_output;
+	rbAmount = 0.005832;
+	threshold = 0.33362176; 
+	consoleType = trunc(p_consoletype * 4.999);
+ switch (consoleType)
+	{
+		case 0: rbAmount = 0.005832; threshold = 0.33362176; break; 
+		case 1: rbAmount = 0.004096; threshold = 0.59969536; break; 
+		case 2: rbAmount = 0.004913; threshold = 0.84934656; break; 
+		case 3: rbAmount = 0.009216; threshold = 0.149; break; 
+		case 4: rbAmount = 0.011449; threshold = 0.092; break; 
+	}
+	rbAmount /= overallscale; 
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+		if (abs(inputSampleL)<1.18e-23) inputSampleL = fpdL * 1.18e-17;
+		if (abs(inputSampleR)<1.18e-23) inputSampleR = fpdR * 1.18e-17;
+		
+		let dielectricScale = abs(2.0-((inputSampleL+nonLin)/nonLin));
+		if (flip) {
+			rbSampleLA = (rbSampleLA * (1.0-(rbAmount*dielectricScale)))+(inputSampleL*rbAmount*dielectricScale);
+			if (abs(rbSampleLA)>1.18e-37) {
+				let bip_delta = inputSampleL; 
+				inputSampleL *= rbSampleLA*0.96;
+				inputSampleL = multiplyAdd(((inputSampleL*inputSampleL) * -0.166666666666666),(inputSampleL*inputSampleL),inputSampleL);
+				inputSampleL /= rbSampleLA*0.96;
+				bip[bip_drbLA] = bip_delta - inputSampleL; 
+				bip[bip_drbLB] = bip[bip_praLA]-bip[bip_drbLA]; bip[bip_praLA] = bip[bip_drbLA];
+				bip[bip_drbLC] = bip[bip_praLB]-bip[bip_drbLB]; bip[bip_praLB] = bip[bip_drbLB];
+				bip[bip_drbLD] = bip[bip_praLC]-bip[bip_drbLC]; bip[bip_praLC] = bip[bip_drbLC];
+				let bip_drbE = bip[bip_praLD]-bip[bip_drbLD]; bip[bip_praLD] = bip[bip_drbLD];
+				inputSampleL *= (1.0+(abs(bip[bip_drbLC])*0.0618)+(abs(bip[bip_drbLD])*-0.05982)+(abs(bip_drbE)*0.0206));
+			}
+			inputSampleL -= rbSampleLA*0.92;
+		} else {
+			rbSampleLB = (rbSampleLB * (1.0-(rbAmount*dielectricScale)))+(inputSampleL*rbAmount*dielectricScale);
+			if (abs(rbSampleLB)>1.18e-37) {
+				let bip_delta = inputSampleL; 
+				inputSampleL *= rbSampleLB*0.96;
+				inputSampleL = multiplyAdd(((inputSampleL*inputSampleL) * -0.166666666666666),(inputSampleL*inputSampleL),inputSampleL);
+				inputSampleL /= rbSampleLB*0.96;
+				bip[bip_drbLA] = bip_delta - inputSampleL; 
+				bip[bip_drbLB] = bip[bip_prbLA]-bip[bip_drbLA]; bip[bip_prbLA] = bip[bip_drbLA];
+				bip[bip_drbLC] = bip[bip_prbLB]-bip[bip_drbLB]; bip[bip_prbLB] = bip[bip_drbLB];
+				bip[bip_drbLD] = bip[bip_prbLC]-bip[bip_drbLC]; bip[bip_prbLC] = bip[bip_drbLC];
+				let bip_drbE = bip[bip_prbLD]-bip[bip_drbLD]; bip[bip_prbLD] = bip[bip_drbLD];
+				inputSampleL *= (1.0+(abs(bip[bip_drbLC])*0.0618)+(abs(bip[bip_drbLD])*-0.05982)+(abs(bip_drbE)*0.0206));
+			}
+			inputSampleL -= rbSampleLB*0.92;
+		}
+
+		dielectricScale = abs(2.0-((inputSampleR+nonLin)/nonLin));
+		if (flip) {
+			rbSampleRA = (rbSampleRA * (1.0-(rbAmount*dielectricScale)))+(inputSampleR*rbAmount*dielectricScale);
+			if (abs(rbSampleRA)>1.18e-37) {
+				let bip_delta = inputSampleR; 
+				inputSampleR *= rbSampleRA*0.96;
+				inputSampleR = multiplyAdd(((inputSampleR*inputSampleR) * -0.166666666666666),(inputSampleR*inputSampleR),inputSampleR);
+				inputSampleR /= rbSampleRA*0.96;
+				bip[bip_drbRA] = bip_delta - inputSampleR; 
+				bip[bip_drbRB] = bip[bip_praRA]-bip[bip_drbRA]; bip[bip_praRA] = bip[bip_drbRA];
+				bip[bip_drbRC] = bip[bip_praRB]-bip[bip_drbRB]; bip[bip_praRB] = bip[bip_drbRB];
+				bip[bip_drbRD] = bip[bip_praRC]-bip[bip_drbRC]; bip[bip_praRC] = bip[bip_drbRC];
+				let bip_drbE = bip[bip_praRD]-bip[bip_drbRD]; bip[bip_praRD] = bip[bip_drbRD];
+				inputSampleR *= (1.0+(abs(bip[bip_drbRC])*0.0618)+(abs(bip[bip_drbRD])*-0.05982)+(abs(bip_drbE)*0.0206));
+			}
+			inputSampleR -= rbSampleRA*0.92;
+		} else {
+			rbSampleRB = (rbSampleRB * (1.0-(rbAmount*dielectricScale)))+(inputSampleR*rbAmount*dielectricScale);
+			if (abs(rbSampleRB)>1.18e-37) {
+				let bip_delta = inputSampleR; 
+				inputSampleR *= rbSampleRB*0.96;
+				inputSampleR = multiplyAdd(((inputSampleR*inputSampleR) * -0.166666666666666),(inputSampleR*inputSampleR),inputSampleR);
+				inputSampleR /= rbSampleRB*0.96;
+				bip[bip_drbRA] = bip_delta - inputSampleR; 
+				bip[bip_drbRB] = bip[bip_prbRA]-bip[bip_drbRA]; bip[bip_prbRA] = bip[bip_drbRA];
+				bip[bip_drbRC] = bip[bip_prbRB]-bip[bip_drbRB]; bip[bip_prbRB] = bip[bip_drbRB];
+				bip[bip_drbRD] = bip[bip_prbRC]-bip[bip_drbRC]; bip[bip_prbRC] = bip[bip_drbRC];
+				let bip_drbE = bip[bip_prbRD]-bip[bip_drbRD]; bip[bip_prbRD] = bip[bip_drbRD];
+				inputSampleR *= (1.0+(abs(bip[bip_drbRC])*0.0618)+(abs(bip[bip_drbRD])*-0.05982)+(abs(bip_drbE)*0.0206));
+			}
+			inputSampleR -= rbSampleRB*0.92;
+		}
+
+		let bip_delta = inputSampleL; 
+		let drySample = inputSampleL;
+		inputSampleL = maximum(minimum(inputSampleL,1.0),-1.0);
+		let phatSample = inputSampleL * 1.57079633; 
+		let X = phatSample; X *= X; 
+		let temp = phatSample * X; 
+		phatSample -= temp*0.16666666666666666666666666666666666; temp *= X;
+		phatSample += temp*0.00833333333333333333333333333333333; temp *= X;
+		phatSample -= temp*0.00019841269841269841269841269841269; temp *= X;
+		phatSample += temp*0.00000275573192239858906525573192239; temp *= X;
+		phatSample -= temp*0.00000002505210838544171877521083854; temp *= X;
+		phatSample += temp*0.00000000016059043836821614599392377; temp *= X;
+		phatSample -= temp*0.00000000000076471637318198164759011; temp *= X;
+		phatSample += temp*0.00000000000000281145725434552076319; temp *= X;
+		phatSample -= temp*0.00000000000000000822063524662432971; temp *= X;
+		phatSample += temp*0.00000000000000000001957294106339126;
+
+		inputSampleL *= 1.2533141373155;
+		
+		let distSample = inputSampleL * abs(inputSampleL); 
+		X = distSample; X *= X; 
+		temp = distSample * X; 
+		distSample -= temp*0.16666666666666666666666666666666666; temp *= X;
+		distSample += temp*0.00833333333333333333333333333333333; temp *= X;
+		distSample -= temp*0.00019841269841269841269841269841269; temp *= X;
+		distSample += temp*0.00000275573192239858906525573192239; temp *= X;
+		distSample -= temp*0.00000002505210838544171877521083854; temp *= X;
+		distSample += temp*0.00000000016059043836821614599392377; temp *= X;
+		distSample -= temp*0.00000000000076471637318198164759011; temp *= X;
+		distSample += temp*0.00000000000000281145725434552076319; temp *= X;
+		distSample -= temp*0.00000000000000000822063524662432971; temp *= X;
+		distSample += temp*0.00000000000000000001957294106339126;
+
+		distSample /= ((abs(inputSampleL) == 0.0) ?1.0:abs(inputSampleL));
+		inputSampleL = distSample; 
+		if (density < 1.0) inputSampleL = (drySample*(1-density))+(distSample*density); 
+		if (phattity > 0.0) inputSampleL = (inputSampleL*(1-phattity))+(phatSample*phattity); 
+		bip[bip_dvLA] = bip_delta - inputSampleL; 
+		bip[bip_dvLB] = bip[bip_pvLA]-bip[bip_dvLA]; bip[bip_pvLA] = bip[bip_dvLA];
+		bip[bip_dvLC] = bip[bip_pvLB]-bip[bip_dvLB]; bip[bip_pvLB] = bip[bip_dvLB];
+		bip[bip_dvLD] = bip[bip_pvLC]-bip[bip_dvLC]; bip[bip_pvLC] = bip[bip_dvLC];
+		let bip_dvE = bip[bip_pvLD]-bip[bip_dvLD]; bip[bip_pvLD] = bip[bip_dvLD];
+		inputSampleL *= (1.0+(abs(bip[bip_dvLC])*0.0618)+(abs(bip[bip_dvLD])*-0.05982)+(abs(bip_dvE)*0.0206));
+		
+		bip_delta = inputSampleR; 
+		drySample = inputSampleR;
+		inputSampleR = maximum(minimum(inputSampleR,1.0),-1.0);
+		phatSample = inputSampleR * 1.57079633; 
+		X = phatSample; X *= X; 
+		temp = phatSample * X; 
+		phatSample -= temp*0.16666666666666666666666666666666666; temp *= X;
+		phatSample += temp*0.00833333333333333333333333333333333; temp *= X;
+		phatSample -= temp*0.00019841269841269841269841269841269; temp *= X;
+		phatSample += temp*0.00000275573192239858906525573192239; temp *= X;
+		phatSample -= temp*0.00000002505210838544171877521083854; temp *= X;
+		phatSample += temp*0.00000000016059043836821614599392377; temp *= X;
+		phatSample -= temp*0.00000000000076471637318198164759011; temp *= X;
+		phatSample += temp*0.00000000000000281145725434552076319; temp *= X;
+		phatSample -= temp*0.00000000000000000822063524662432971; temp *= X;
+		phatSample += temp*0.00000000000000000001957294106339126;
+
+		inputSampleR *= 1.2533141373155;
+		
+		distSample = inputSampleR * abs(inputSampleR); 
+		X = distSample; X *= X; 
+		temp = distSample * X; 
+		distSample -= temp*0.16666666666666666666666666666666666; temp *= X;
+		distSample += temp*0.00833333333333333333333333333333333; temp *= X;
+		distSample -= temp*0.00019841269841269841269841269841269; temp *= X;
+		distSample += temp*0.00000275573192239858906525573192239; temp *= X;
+		distSample -= temp*0.00000002505210838544171877521083854; temp *= X;
+		distSample += temp*0.00000000016059043836821614599392377; temp *= X;
+		distSample -= temp*0.00000000000076471637318198164759011; temp *= X;
+		distSample += temp*0.00000000000000281145725434552076319; temp *= X;
+		distSample -= temp*0.00000000000000000822063524662432971; temp *= X;
+		distSample += temp*0.00000000000000000001957294106339126;
+
+		distSample /= ((abs(inputSampleR) == 0.0) ?1.0:abs(inputSampleR));
+		inputSampleR = distSample; 
+		if (density < 1.0) inputSampleR = (drySample*(1-density))+(distSample*density); 
+		if (phattity > 0.0) inputSampleR = (inputSampleR*(1-phattity))+(phatSample*phattity); 
+		bip[bip_dvRA] = bip_delta - inputSampleR; 
+		bip[bip_dvRB] = bip[bip_pvRA]-bip[bip_dvRA]; bip[bip_pvRA] = bip[bip_dvRA];
+		bip[bip_dvRC] = bip[bip_pvRB]-bip[bip_dvRB]; bip[bip_pvRB] = bip[bip_dvRB];
+		bip[bip_dvRD] = bip[bip_pvRC]-bip[bip_dvRC]; bip[bip_pvRC] = bip[bip_dvRC];
+		bip_dvE = bip[bip_pvRD]-bip[bip_dvRD]; bip[bip_pvRD] = bip[bip_dvRD];
+		inputSampleR *= (1.0+(abs(bip[bip_dvRC])*0.0618)+(abs(bip[bip_dvRD])*-0.05982)+(abs(bip_dvE)*0.0206));
+		
+		let clamp = (lastSampleLB - lastSampleLC) * 0.381966011250105;
+		clamp -= (lastSampleLA - lastSampleLB) * 0.6180339887498948482045;
+		clamp += inputSampleL - lastSampleLA; 
+		lastSampleLC = lastSampleLB;
+		lastSampleLB = lastSampleLA;
+		lastSampleLA = inputSampleL; 
+		if (clamp > threshold)
+			inputSampleL = lastSampleLB + threshold;
+		if (-clamp > threshold)
+			inputSampleL = lastSampleLB - threshold;
+		
+		lastSampleLA = (lastSampleLA*0.381966011250105)+(inputSampleL*0.6180339887498948482045);
+		
+		clamp = (lastSampleRB - lastSampleRC) * 0.381966011250105;
+		clamp -= (lastSampleRA - lastSampleRB) * 0.6180339887498948482045;
+		clamp += inputSampleR - lastSampleRA; 
+		lastSampleRC = lastSampleRB;
+		lastSampleRB = lastSampleRA;
+		lastSampleRA = inputSampleR; 
+		if (clamp > threshold)
+			inputSampleR = lastSampleRB + threshold;
+		if (-clamp > threshold)
+			inputSampleR = lastSampleRB - threshold;
+		
+		lastSampleRA = (lastSampleRA*0.381966011250105)+(inputSampleR*0.6180339887498948482045);
+
+		flip = !flip;
+		if (output < 1.0)
+		{
+			inputSampleL *= output;
+			inputSampleR *= output;
+		}
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+		if (unsigned32(fpdL-fpdR) < 1073741824 || unsigned32(fpdR-fpdL) < 1073741824) {
+			fpdR = advanceRandom(fpdR);}
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

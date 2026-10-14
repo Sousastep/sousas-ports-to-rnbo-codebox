@@ -1,0 +1,479 @@
+/* TakeCare — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Speed
+@param({ min: 0, max: 1 }) p_speed = 0.15;
+// VST B: Rando
+@param({ min: 0, max: 1 }) p_rando = 0.5;
+// VST C: Depth
+@param({ min: 0, max: 1 }) p_depth = 0.5;
+// VST D: Regen
+@param({ min: 0, max: 1 }) p_regen = 0.5;
+// VST E: Derez
+@param({ min: 0, max: 1 }) p_derez = 0.5;
+// VST F: Buffer
+@param({ min: 0, max: 1 }) p_buffer = 0.5;
+// VST G: Output
+@param({ min: 0, max: 1 }) p_output = 1.0;
+// VST H: Dry/Wet
+@param({ min: 0, max: 1 }) p_drywet = 1.0;
+
+const bez_AL = 0;
+const bez_AR = 1;
+const bez_BL = 2;
+const bez_BR = 3;
+const bez_CL = 4;
+const bez_CR = 5;
+const bez_InL = 6;
+const bez_InR = 7;
+const bez_UnInL = 8;
+const bez_UnInR = 9;
+const bez_SampL = 10;
+const bez_SampR = 11;
+const bez_AvgInSampL = 12;
+const bez_AvgInSampR = 13;
+const bez_AvgOutSampL = 14;
+const bez_AvgOutSampR = 15;
+const bez_cycle = 16;
+const bez_total = 17;
+@state a3AL = new FixedFloat64Array(32767+5);
+@state a3BL = new FixedFloat64Array(32767+5);
+@state a3CL = new FixedFloat64Array(32767+5);
+@state a3DL = new FixedFloat64Array(32767+5);
+@state a3EL = new FixedFloat64Array(32767+5);
+@state a3FL = new FixedFloat64Array(32767+5);
+@state a3GL = new FixedFloat64Array(32767+5);
+@state a3HL = new FixedFloat64Array(32767+5);
+@state a3IL = new FixedFloat64Array(32767+5);
+@state a3AR = new FixedFloat64Array(32767+5);
+@state a3BR = new FixedFloat64Array(32767+5);
+@state a3CR = new FixedFloat64Array(32767+5);
+@state a3DR = new FixedFloat64Array(32767+5);
+@state a3ER = new FixedFloat64Array(32767+5);
+@state a3FR = new FixedFloat64Array(32767+5);
+@state a3GR = new FixedFloat64Array(32767+5);
+@state a3HR = new FixedFloat64Array(32767+5);
+@state a3IR = new FixedFloat64Array(32767+5);
+@state c3AL: Int = 0;
+@state c3AR: Int = 0;
+@state c3BL: Int = 0;
+@state c3BR: Int = 0;
+@state c3CL: Int = 0;
+@state c3CR: Int = 0;
+@state c3DL: Int = 0;
+@state c3DR: Int = 0;
+@state c3EL: Int = 0;
+@state c3ER: Int = 0;
+@state c3FL: Int = 0;
+@state c3FR: Int = 0;
+@state c3GL: Int = 0;
+@state c3GR: Int = 0;
+@state c3HL: Int = 0;
+@state c3HR: Int = 0;
+@state c3IL: Int = 0;
+@state c3IR: Int = 0;
+@state f3AL = 0;
+@state f3BL = 0;
+@state f3CL = 0;
+@state f3CR = 0;
+@state f3FR = 0;
+@state f3IR = 0;
+@state avg3L = 0;
+@state avg3R = 0;
+@state bez = new FixedFloat64Array(bez_total);
+@state rotate = 0;
+@state oldfpd = 0;
+@state buf: Int = 0;
+@state vibDepth = 0;
+@state derezA = 0;
+@state derezB = 0;
+@state outA = 0;
+@state outB = 0;
+@state wetA = 0;
+@state wetB = 0;
+@state lastSampleL = 0;
+@state wasPosClipL = 0;
+@state wasNegClipL = 0;
+@state lastSampleR = 0;
+@state wasPosClipR = 0;
+@state wasNegClipR = 0;
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state spacing: Int = 0;
+@state vibSpeed = 0;
+@state vibRandom = 0;
+@state targetDepth = 0;
+@state reg3n = 0;
+@state stepped = 0;
+@state bezFraction: Int = 0;
+@state bezTrim = 0;
+@state targetBuf: Int = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+function init() {
+
+	for(let x: Int = 0; x < 32767+2; x++) {a3AL[x] = 0.0; a3AR[x] = 0.0;}
+	for(let x: Int = 0; x < 32767+2; x++) {a3BL[x] = 0.0; a3BR[x] = 0.0;}
+	for(let x: Int = 0; x < 32767+2; x++) {a3CL[x] = 0.0; a3CR[x] = 0.0;}
+	for(let x: Int = 0; x < 32767+2; x++) {a3DL[x] = 0.0; a3DR[x] = 0.0;}
+	for(let x: Int = 0; x < 32767+2; x++) {a3EL[x] = 0.0; a3ER[x] = 0.0;}
+	for(let x: Int = 0; x < 32767+2; x++) {a3FL[x] = 0.0; a3FR[x] = 0.0;}
+	for(let x: Int = 0; x < 32767+2; x++) {a3GL[x] = 0.0; a3GR[x] = 0.0;}
+	for(let x: Int = 0; x < 32767+2; x++) {a3HL[x] = 0.0; a3HR[x] = 0.0;}
+	for(let x: Int = 0; x < 32767+2; x++) {a3IL[x] = 0.0; a3IR[x] = 0.0;}
+	c3AL = c3BL = c3CL = c3DL = c3EL = c3FL = c3GL = c3HL = c3IL = 1;
+	c3AR = c3BR = c3CR = c3DR = c3ER = c3FR = c3GR = c3HR = c3IR = 1;
+	f3AL = f3BL = f3CL = 0.0;
+	f3CR = f3FR = f3IR = 0.0;
+	avg3L = avg3R = 0.0;
+	
+	for (let x: Int = 0; x < bez_total; x++) bez[x] = 0.0;
+	bez[bez_cycle] = 1.0;
+	
+	rotate = 0.0;
+	oldfpd = 0.4294967295;
+	
+	buf = 8192;
+	vibDepth = 0.0;
+	outA = 1.0;
+	outB = 1.0;
+	wetA = 1.0;
+	wetB = 1.0;
+	derezA = 0.5;
+	derezB = 0.5;
+	
+	lastSampleL = 0.0;
+	wasPosClipL = 0;
+	wasNegClipL = 0;
+	lastSampleR = 0.0;
+	wasPosClipR = 0;
+	wasNegClipR = 0;
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 1.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();
+	spacing = floor(overallscale); 
+	if (spacing < 1) spacing = 1; if (spacing > 16) spacing = 16;
+	vibSpeed = pow(p_speed,5.0) * 0.1;
+	vibRandom = pow(p_rando,3.0) * 0.99;
+	targetDepth = pow(p_depth,2.0) * 0.5;
+	reg3n = p_regen*0.0625;
+	
+	derezA = derezB; derezB = p_derez*2.0;
+	stepped = 1; 
+	if (derezB > 1.0) {  
+		stepped = 0; 
+		derezB = 1.0-(derezB-1.0);
+	} 
+	derezB = minimum(maximum(derezB/overallscale,0.0005),1.0);
+	bezFraction = toIndex(1.0/derezB);
+	bezTrim = bezFraction/(bezFraction+1.0);
+	if (stepped) { 
+		derezB = 1.0 / bezFraction;
+		bezTrim = 1.0-(derezB*bezTrim);
+	} else { 
+		derezB /= (2.0/pow(overallscale,0.5-((overallscale-1.0)*0.0375)));
+		bezTrim = 1.0-pow(derezB*0.5,1.0/(derezB*0.5));
+	} 
+	
+	targetBuf = (pow(p_buffer,3.0)*32510.0)+256;
+	outA = outB; outB = p_output;
+	wetA = wetB; wetB = 1.0-pow(1.0-p_drywet,2.0);
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+		if (abs(inputSampleL)<1.18e-23) inputSampleL = fpdL * 1.18e-17;
+		if (abs(inputSampleR)<1.18e-23) inputSampleR = fpdR * 1.18e-17;
+		let drySampleL = inputSampleL;
+		let drySampleR = inputSampleR;
+		let temp = sampleFrames/inFramesToProcess;
+		let derez = (derezA*temp)+(derezB*(1.0-temp));
+		let out = (outA*temp)+(outB*(1.0-temp));
+		let wet = (wetA*temp)+(wetB*(1.0-temp));
+		
+		bez[bez_cycle] += derez;
+		bez[bez_SampL] += ((inputSampleL+bez[bez_InL]) * derez);
+		bez[bez_SampR] += ((inputSampleR+bez[bez_InR]) * derez);
+		bez[bez_InL] = inputSampleL; bez[bez_InR] = inputSampleR;
+		if (bez[bez_cycle] > 1.0) { 
+			if (stepped) bez[bez_cycle] = 0.0;
+			else bez[bez_cycle] -= 1.0;
+			
+			inputSampleL = (bez[bez_SampL]+bez[bez_AvgInSampL])*0.5;
+			bez[bez_AvgInSampL] = bez[bez_SampL];
+			inputSampleR = (bez[bez_SampR]+bez[bez_AvgInSampR])*0.5;
+			bez[bez_AvgInSampR] = bez[bez_SampR];
+			
+			rotate += (oldfpd*vibSpeed);
+			if (rotate > (PI*2.0)) {
+				rotate -= (PI*2.0);
+				oldfpd = (1.0-vibRandom) + ((fpdL*0.000000000618)*vibRandom);
+			}
+			vibDepth = (vibDepth*0.99)+(targetDepth*0.01);
+			if (buf < targetBuf) buf++;
+			if (buf > targetBuf) buf--;
+			
+			let mA = (sin(rotate)+1.0)*vibDepth*buf;
+			let mB = (sin(rotate+(PI/9.0))+1.0)*vibDepth*buf;
+			let mC = (sin(rotate+((PI/9.0)*2.0))+1.0)*vibDepth*buf;
+			let mD = (sin(rotate+((PI/9.0)*3.0))+1.0)*vibDepth*buf;
+			let mE = (sin(rotate+((PI/9.0)*4.0))+1.0)*vibDepth*buf;
+			let mF = (sin(rotate+((PI/9.0)*5.0))+1.0)*vibDepth*buf;
+			let mG = (sin(rotate+((PI/9.0)*6.0))+1.0)*vibDepth*buf;
+			let mH = (sin(rotate+((PI/9.0)*7.0))+1.0)*vibDepth*buf;
+			let mI = (sin(rotate+((PI/9.0)*8.0))+1.0)*vibDepth*buf;		
+			
+			inputSampleL = sin(minimum(maximum(inputSampleL*0.5,-(PI*0.5)),(PI*0.5)));
+			inputSampleR = sin(minimum(maximum(inputSampleR*0.5,-(PI*0.5)),(PI*0.5)));
+			
+			a3AL[c3AL] = inputSampleL + minimum(maximum(f3AL*reg3n,-PI),PI);
+			a3BL[c3BL] = inputSampleL + minimum(maximum(f3BL*reg3n,-PI),PI);
+			a3CL[c3CL] = inputSampleL + minimum(maximum(f3CL*reg3n,-PI),PI);
+			
+			a3CR[c3CR] = inputSampleR + minimum(maximum(f3CR*reg3n,-PI),PI);
+			a3FR[c3FR] = inputSampleR + minimum(maximum(f3FR*reg3n,-PI),PI);
+			a3IR[c3IR] = inputSampleR + minimum(maximum(f3IR*reg3n,-PI),PI);
+			
+			c3AL++; if (c3AL < 0 || c3AL > buf) c3AL = 0;
+			c3BL++; if (c3BL < 0 || c3BL > buf) c3BL = 0;
+			c3CL++; if (c3CL < 0 || c3CL > buf) c3CL = 0;
+			c3CR++; if (c3CR < 0 || c3CR > buf) c3CR = 0;
+			c3FR++; if (c3FR < 0 || c3FR > buf) c3FR = 0;
+			c3IR++; if (c3IR < 0 || c3IR > buf) c3IR = 0;
+			
+let readIndex1: Int = trunc(c3AL+mA-((c3AL+mA>buf)?buf+1:0));
+			let o3AL = a3AL[readIndex1] *(1.0-(mA-floor(mA)));
+let readIndex2: Int = trunc(c3AL+mA+1-((c3AL+mA+1>buf)?buf+1:0));
+			o3AL += (a3AL[readIndex2] *((mA-floor(mA))));
+let readIndex3: Int = trunc(c3BL+mB-((c3BL+mB>buf)?buf+1:0));
+			let o3BL = a3BL[readIndex3] *(1.0-(mB-floor(mB)));
+let readIndex4: Int = trunc(c3BL+mB+1-((c3BL+mB+1>buf)?buf+1:0));
+			o3BL += (a3BL[readIndex4] *((mB-floor(mB))));
+let readIndex5: Int = trunc(c3CL+mC-((c3CL+mC>buf)?buf+1:0));
+			let o3CL = a3CL[readIndex5] *(1.0-(mC-floor(mC)));
+let readIndex6: Int = trunc(c3CL+mC+1-((c3CL+mC+1>buf)?buf+1:0));
+			o3CL += (a3CL[readIndex6] *((mC-floor(mC))));
+let readIndex7: Int = trunc(c3CR+mC-((c3CR+mC>buf)?buf+1:0));
+			let o3CR = a3CR[readIndex7] *(1.0-(mC-floor(mC)));
+let readIndex8: Int = trunc(c3CR+mC+1-((c3CR+mC+1>buf)?buf+1:0));
+			o3CR += (a3CR[readIndex8] *((mC-floor(mC))));
+let readIndex9: Int = trunc(c3FR+mF-((c3FR+mF>buf)?buf+1:0));
+			let o3FR = a3FR[readIndex9] *(1.0-(mF-floor(mF)));
+let readIndex10: Int = trunc(c3FR+mF+1-((c3FR+mF+1>buf)?buf+1:0));
+			o3FR += (a3FR[readIndex10] *((mF-floor(mF))));
+let readIndex11: Int = trunc(c3IR+mI-((c3IR+mI>buf)?buf+1:0));
+			let o3IR = a3IR[readIndex11] *(1.0-(mI-floor(mI)));
+let readIndex12: Int = trunc(c3IR+mI+1-((c3IR+mI+1>buf)?buf+1:0));
+			o3IR += (a3IR[readIndex12] *((mI-floor(mI))));
+			
+			a3DL[c3DL] = (((o3BL + o3CL) * -2.0) + o3AL);
+			a3EL[c3EL] = (((o3AL + o3CL) * -2.0) + o3BL);
+			a3FL[c3FL] = (((o3AL + o3BL) * -2.0) + o3CL);
+			a3BR[c3BR] = (((o3FR + o3IR) * -2.0) + o3CR);
+			a3ER[c3ER] = (((o3CR + o3IR) * -2.0) + o3FR);
+			a3HR[c3HR] = (((o3CR + o3FR) * -2.0) + o3IR);
+			
+			c3DL++; if (c3DL < 0 || c3DL > buf) c3DL = 0;
+			c3EL++; if (c3EL < 0 || c3EL > buf) c3EL = 0;
+			c3FL++; if (c3FL < 0 || c3FL > buf) c3FL = 0;
+			c3BR++; if (c3BR < 0 || c3BR > buf) c3BR = 0;
+			c3ER++; if (c3ER < 0 || c3ER > buf) c3ER = 0;
+			c3HR++; if (c3HR < 0 || c3HR > buf) c3HR = 0;
+			
+let readIndex13: Int = trunc(c3DL+mD-((c3DL+mD>buf)?buf+1:0));
+			let o3DL = a3DL[readIndex13] *(1.0-(mD-floor(mD)));
+let readIndex14: Int = trunc(c3DL+mD+1-((c3DL+mD+1>buf)?buf+1:0));
+			o3DL += (a3DL[readIndex14] *((mD-floor(mD))));
+let readIndex15: Int = trunc(c3EL+mE-((c3EL+mE>buf)?buf+1:0));
+			let o3EL = a3EL[readIndex15] *(1.0-(mE-floor(mE)));
+let readIndex16: Int = trunc(c3EL+mE+1-((c3EL+mE+1>buf)?buf+1:0));
+			o3EL += (a3EL[readIndex16] *((mE-floor(mE))));
+let readIndex17: Int = trunc(c3FL+mF-((c3FL+mF>buf)?buf+1:0));
+			let o3FL = a3FL[readIndex17] *(1.0-(mF-floor(mF)));
+let readIndex18: Int = trunc(c3FL+mF+1-((c3FL+mF+1>buf)?buf+1:0));
+			o3FL += (a3FL[readIndex18] *((mF-floor(mF))));
+let readIndex19: Int = trunc(c3BR+mB-((c3BR+mB>buf)?buf+1:0));
+			let o3BR = a3BR[readIndex19] *(1.0-(mB-floor(mB)));
+let readIndex20: Int = trunc(c3BR+mB+1-((c3BR+mB+1>buf)?buf+1:0));
+			o3BR += (a3BR[readIndex20] *((mB-floor(mB))));
+let readIndex21: Int = trunc(c3ER+mE-((c3ER+mE>buf)?buf+1:0));
+			let o3ER = a3ER[readIndex21] *(1.0-(mE-floor(mE)));
+let readIndex22: Int = trunc(c3ER+mE+1-((c3ER+mE+1>buf)?buf+1:0));
+			o3ER += (a3ER[readIndex22] *((mE-floor(mE))));
+let readIndex23: Int = trunc(c3HR+mH-((c3HR+mH>buf)?buf+1:0));
+			let o3HR = a3HR[readIndex23] *(1.0-(mH-floor(mH)));
+let readIndex24: Int = trunc(c3HR+mH+1-((c3HR+mH+1>buf)?buf+1:0));
+			o3HR += (a3HR[readIndex24] *((mH-floor(mH))));
+			
+			a3GL[c3GL] = (((o3EL + o3FL) * -2.0) + o3DL);
+			a3HL[c3HL] = (((o3DL + o3FL) * -2.0) + o3EL);
+			a3IL[c3IL] = (((o3DL + o3EL) * -2.0) + o3FL);
+			a3AR[c3AR] = (((o3ER + o3HR) * -2.0) + o3BR);
+			a3DR[c3DR] = (((o3BR + o3HR) * -2.0) + o3ER);
+			a3GR[c3GR] = (((o3BR + o3ER) * -2.0) + o3HR);
+
+			c3GL++; if (c3GL < 0 || c3GL > buf) c3GL = 0;
+			c3HL++; if (c3HL < 0 || c3HL > buf) c3HL = 0;
+			c3IL++; if (c3IL < 0 || c3IL > buf) c3IL = 0;
+			c3AR++; if (c3AR < 0 || c3AR > buf) c3AR = 0;
+			c3DR++; if (c3DR < 0 || c3DR > buf) c3DR = 0;
+			c3GR++; if (c3GR < 0 || c3GR > buf) c3GR = 0;
+			
+let readIndex25: Int = trunc(c3GL+mG-((c3GL+mG>buf)?buf+1:0));
+			let o3GL = a3GL[readIndex25] *(1.0-(mG-floor(mG)));
+let readIndex26: Int = trunc(c3GL+mG+1-((c3GL+mG+1>buf)?buf+1:0));
+			o3GL += (a3GL[readIndex26] *((mG-floor(mG))));
+let readIndex27: Int = trunc(c3HL+mH-((c3HL+mH>buf)?buf+1:0));
+			let o3HL = a3HL[readIndex27] *(1.0-(mH-floor(mH)));
+let readIndex28: Int = trunc(c3HL+mH+1-((c3HL+mH+1>buf)?buf+1:0));
+			o3HL += (a3HL[readIndex28] *((mH-floor(mH))));
+let readIndex29: Int = trunc(c3IL+mI-((c3IL+mI>buf)?buf+1:0));
+			let o3IL = a3IL[readIndex29] *(1.0-(mI-floor(mI)));
+let readIndex30: Int = trunc(c3IL+mI+1-((c3IL+mI+1>buf)?buf+1:0));
+			o3IL += (a3IL[readIndex30] *((mI-floor(mI))));
+let readIndex31: Int = trunc(c3AR+mA-((c3AR+mA>buf)?buf+1:0));
+			let o3AR = a3AR[readIndex31] *(1.0-(mA-floor(mA)));
+let readIndex32: Int = trunc(c3AR+mA+1-((c3AR+mA+1>buf)?buf+1:0));
+			o3AR += (a3AR[readIndex32] *((mA-floor(mA))));
+let readIndex33: Int = trunc(c3DR+mD-((c3DR+mD>buf)?buf+1:0));
+			let o3DR = a3DR[readIndex33] *(1.0-(mD-floor(mD)));
+let readIndex34: Int = trunc(c3DR+mD+1-((c3DR+mD+1>buf)?buf+1:0));
+			o3DR += (a3DR[readIndex34] *((mD-floor(mD))));
+let readIndex35: Int = trunc(c3GR+mG-((c3GR+mG>buf)?buf+1:0));
+			let o3GR = a3GR[readIndex35] *(1.0-(mG-floor(mG)));
+let readIndex36: Int = trunc(c3GR+mG+1-((c3GR+mG+1>buf)?buf+1:0));
+			o3GR += (a3GR[readIndex36] *((mG-floor(mG))));
+			
+			f3AL = (((o3GR + o3HR) * -2.0) + o3IR);				
+			f3BL = (((o3GR + o3HR) * -2.0) + o3IR);
+			f3CL = (((o3GR + o3HR) * -2.0) + o3IR);
+			
+			f3CR = (((o3AL + o3DL) * -2.0) + o3GL);
+			f3FR = (((o3AL + o3DL) * -2.0) + o3GL);
+			f3IR = (((o3AL + o3DL) * -2.0) + o3GL);
+			
+			let reverbSampleL = (o3GL + o3HL + o3IL)*0.03125;
+			let reverbSampleR = (o3AR + o3DR + o3GR)*0.03125;
+			
+			f3AL = (f3AL+f3AL+f3AL+abs(avg3L))*0.25; avg3L = f3AL;
+			f3CR = (f3CR+f3CR+f3CR+abs(avg3R))*0.25; avg3R = f3CR;
+
+			reverbSampleL = minimum(maximum(reverbSampleL,-4.0),4.0);
+			if (wasPosClipL == 1) { 
+				if (reverbSampleL<lastSampleL) lastSampleL=0.79+(reverbSampleL*0.2);
+				else lastSampleL = 0.2+(lastSampleL*0.79);
+			} wasPosClipL = 0;
+			if (reverbSampleL>0.99) {wasPosClipL=1;reverbSampleL=0.79+(lastSampleL*0.2);}
+			if (wasNegClipL == 1) { 
+				if (reverbSampleL > lastSampleL) lastSampleL=-0.79+(reverbSampleL*0.2);
+				else lastSampleL=-0.2+(lastSampleL*0.79);
+			} wasNegClipL = 0;
+			if (reverbSampleL<-0.99) {wasNegClipL=1;reverbSampleL=-0.79+(lastSampleL*0.2);}
+			lastSampleL = reverbSampleL;
+			reverbSampleR = minimum(maximum(reverbSampleR,-4.0),4.0);
+			if (wasPosClipR == 1) { 
+				if (reverbSampleR<lastSampleR) lastSampleR=0.79+(reverbSampleR*0.2);
+				else lastSampleR = 0.2+(lastSampleR*0.79);
+			} wasPosClipR = 0;
+			if (reverbSampleR>0.99) {wasPosClipR=1;reverbSampleR=0.79+(lastSampleR*0.2);}
+			if (wasNegClipR == 1) { 
+				if (reverbSampleR > lastSampleR) lastSampleR=-0.79+(reverbSampleR*0.2);
+				else lastSampleR=-0.2+(lastSampleR*0.79);
+			} wasNegClipR = 0;
+			if (reverbSampleR<-0.99) {wasNegClipR=1;reverbSampleR=-0.79+(lastSampleR*0.2);}
+			lastSampleR = reverbSampleR;
+
+			reverbSampleL = asin(reverbSampleL*0.7);
+			reverbSampleR = asin(reverbSampleR*0.7);
+			
+			bez[bez_CL] = bez[bez_BL];
+			bez[bez_BL] = bez[bez_AL];
+			bez[bez_AL] = reverbSampleL;
+			bez[bez_SampL] = 0.0;
+			
+			bez[bez_CR] = bez[bez_BR];
+			bez[bez_BR] = bez[bez_AR];
+			bez[bez_AR] = reverbSampleR;
+			bez[bez_SampR] = 0.0;
+		}
+		
+		let X = bez[bez_cycle] * bezTrim;
+		let CBL = (bez[bez_CL]*(1.0-X))+(bez[bez_BL]*X);
+		let CBR = (bez[bez_CR]*(1.0-X))+(bez[bez_BR]*X);
+		let BAL = (bez[bez_BL]*(1.0-X))+(bez[bez_AL]*X);
+		let BAR = (bez[bez_BR]*(1.0-X))+(bez[bez_AR]*X);
+		let CBAL = (bez[bez_BL]+(CBL*(1.0-X))+(BAL*X))*-0.25;
+		let CBAR = (bez[bez_BR]+(CBR*(1.0-X))+(BAR*X))*-0.25;
+		inputSampleL = CBAL+bez[bez_AvgOutSampL]; bez[bez_AvgOutSampL] = CBAL;
+		inputSampleR = CBAR+bez[bez_AvgOutSampR]; bez[bez_AvgOutSampR] = CBAR;
+		
+		if (out != 1.0) {
+			inputSampleL *= out;
+			inputSampleR *= out;
+		}
+		
+		if (wet != 1.0) {
+			inputSampleL = (inputSampleL * wet) + (drySampleL * (1.0-wet));
+			inputSampleR = (inputSampleR * wet) + (drySampleR * (1.0-wet));
+		}
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

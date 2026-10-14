@@ -1,0 +1,65 @@
+X2Buss — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/x2buss/
+
+What it is: the "X"-generation 2-buss: four bands of tone control (High,
+HiMid, LoMid, Bass) done with nonlinear (x|x|x) biquads and a soft-clip
+clipper stage on the output (the ADClip filter family, shared with
+ZAcidLowpass / ZOutputStage tone stages). Tone is musical "console turn the
+knob a little" rather than surgical EQ. This RNBO port uses the original
+normalized 0..1 values; note the port allocates the correct 33/65 slew
+buffers (README note: the source would otherwise overrun).
+
+Parameters:
+
+- p_high (High) 0..1, default 0.5
+  High-band gain. Centered at 0.5 (= flat); each side is a mild
+  nonlinear x|x|x boost/cut, maximum about +/-6 dB, curved (not dB-taper
+  but nonlinear gain factor 1 + x*|x|*|x| with x = 2(p-0.5)). Small moves
+  sound great, big moves get a bit "solid-state".
+
+- p_hmid (HMid) 0..1, default 0.5
+  Same taper for the high-mid shelf/peak band.
+
+- p_lmid (LMid) 0..1, default 0.5
+  Same taper for the low-mid shelf band.
+
+- p_bass (Bass) 0..1, default 0.5
+  Same taper for the bass shelf band.
+
+- p_highf (HighF) 0..1, default 0.5
+  Reference frequency adjust for the high band (0.5 = neutral). It moves
+  the high corner from its default up or down, modulated also by the
+  neighboring bands' references, so this is a "family" control rather
+  than an absolute Hz readout.
+
+- p_hmidf (HMidF) 0..1, default 0.5
+  Same idea for the high-mid band, which also sets the Q of the high band
+  (inter-band interaction, by design: treble and hi-mid lean on each
+  other).
+
+- p_lmidf (LMidF) 0..1, default 0.5
+  Low-mid reference; affects the low-mid band and the mid Q.
+
+- p_bassf (BassF) 0..1, default 0.5
+  Bass reference; also affects the low Q. Bands with 0.5/0.5/0.5/0.5 keep
+  the classic X2 reference points.
+
+All four (p_highf, p_hmidf, p_lmidf, p_bassf) are done with smooth
+nonlinear reference shifts rather than octave-week straight jumps, so
+move them in small steps for natural tone.
+
+- p_thresh (Thresh) 0..1, default 1.0
+  Output clipper ceiling, with ADClip-style noise for reconstructing most
+  one-sample top shapes; 1.0 = clipper at the limits (mostly passive),
+  lower settings progressively squish and distort the buss mix. Very
+  steep: small downward moves already matter.
+
+- p_fader (Fader) 0..1, default 0.5
+  Master gain/fader on the output, linear 0..1; 0.5 = unity by convention
+  inside the source (like a real console fader).
+
+Musical notes: this is a console-flavored tone + safety buss. Use the four
+tone controls around 0.45-0.6 for "console glue" moves and Thresh below
+1.0 only when the mix pushes - it eats a lot of level when engaged.
+Beware the internal reference-frequency interaction: raise BassF if the
+Bass shelf sits around the kick, or it'll lose instead of gain punch.

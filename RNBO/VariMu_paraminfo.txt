@@ -1,0 +1,41 @@
+VariMu — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/varimu-vst/
+
+What it is: an airwindows-style Vari-Mu (variable-mu tube-style)
+compressor: the gain cell is a muVary function with a variable slope curve,
+controlled by a fixed threshold, with a smoothed sliding release. It is a
+5th-family Airwindows compressor: clean, musical, with automatic makeup
+gain and no ratio/pump controls, purely driven by the "mu" physics.
+This RNBO port uses the original normalized 0..1 values.
+
+Parameters:
+
+- p_intensty (Intensity) 0..1, default 0.0
+  Effectively the compressor's threshold via the threshold variable
+  threshold = 1.001 - (1 - (1-p)^3): the cubic taper puts nearly all of
+  the action in the top 30% of the knob. Small values (0..0.2) hardly slow
+  anything down (near-bypass, included auto makeup); values 0.6+ are the
+  sweet zone; 1.0 is extreme limiting. Automatic makeup gain is included
+  in the output mapping at all settings.
+
+- p_speed (Speed) 0..1, default 0.5
+  Release time. Internally release = pow(1.15-p, 5) * 32768 / overallscale,
+  then divided down for the two sliding speed histories. That makes a very
+  steep curve: at p=1.0 release is almost instantaneous; at 0.0 it is
+  several seconds long. Default 0.5 is roughly a medium-fast program
+  release. This is "release character", not literally calibrated meters.
+
+- p_output (Output) 0..1, default 1.0
+  Output trim on top of the automatic muMakeupGain (which is calculated
+  from Intensity, so Incre
+
+ase actually becomes louder as you compress):
+  output = outGain * p_output.
+
+- p_drywet (Dry/Wet) 0..1, default 1.0
+  Linear dry/wet blend.
+
+Musical notes: the classic Airwindows "nothing to see here, sounds like a
+tape buss" compressor. Typical master-buss use: Intensity 0.6, Speed 0.5,
+Output 1.0. Because of the nonlinear makeup curve, watch your ears/buss
+level as you push Intensity; set level with Output afterwards.

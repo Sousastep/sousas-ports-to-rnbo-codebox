@@ -1,0 +1,79 @@
+// RCInflator 2 (Ideal Edition), lewloiwc, v1.0.
+// Inspired by Sonnox Oxford Inflator / RCJacH, sai'ke and chmaha.
+// RNBO codebox~: in1/in2 = stereo input; out1/out2 = stereo output.
+// Original slider units and defaults. Effect In is NOT a full bypass:
+// input gain, input clipping and output gain remain active, as in JSFX.
+@param({ min: -6, max: 12 }) input_db = 0;
+@param({ min: 0, max: 100 }) effect = 0;
+@param({ min: -50, max: 50 }) curve = 0;
+@param({ enum: ["Off", "On"] }) clip = 1;
+@param({ enum: ["Off", "On"] }) band_split = 0;
+@param({ enum: ["Off", "On"] }) effect_in = 1;
+@param({ min: -12, max: 0 }) output_db = 0;
+
+@state integrators = new FixedFloat64Array(2, 2);
+@state ca = 0;
+@state cb = 0;
+@state midgain = 1;
+@state pre = 1;
+@state postgain = 1;
+@state wet = 0;
+@state dry = 1;
+@state a = 1.5;
+@state b = 0;
+@state c = -0.5;
+@state d = 0.0625;
+@state frame: Int = 0;
+
+function dspsetup() { frame = 0; }
+function shape(x) {
+    let y = abs(x);
+    let shaped = 0;
+    if (y < 1) {
+        let yy = y*y;
+        shaped = a*y + b*yy + c*y*yy - d*(yy - 2*yy*y + yy*yy);
+    } else if (y < 2) {
+        shaped = 2*y - y*y;
+    }
+    let polarity = 0;
+    if (x > 0) polarity = 1;
+    if (x < 0) polarity = -1;
+    return shaped*wet*polarity + x*dry;
+}
+function processChannel(x, ch: Int) {
+    let limit = 2;
+    if (clip != 0) limit = 1;
+    x = clamp(x*pre, -limit, limit);
+    if (effect_in != 0) {
+        if (band_split != 0) {
+            let low = integrators[ch][0] + ca*(x-integrators[ch][0]);
+            integrators[ch][0] = 2*low-integrators[ch][0];
+            let r = (1-cb)*integrators[ch][1] + cb*x;
+            integrators[ch][1] = 2*r-integrators[ch][1];
+            let high = x-r;
+            let mid = x-low-high;
+            x = shape(low) + shape(mid*midgain)/midgain + shape(high);
+        } else {
+            x = shape(x);
+        }
+    }
+    return x*postgain;
+}
+if (frame == 0) {
+    // Source crossovers, updated on sample-rate changes as well.
+    ca = tan(PI*(240/samplerate()-0.25))*0.5+0.5;
+    cb = tan(PI*(2400/samplerate()-0.25))*0.5+0.5;
+    midgain = cb*(1-ca)/(cb-ca);
+    pre = pow(10, input_db*0.05);
+    postgain = pow(10, output_db*0.05);
+    wet = effect*0.01;
+    dry = 1-wet;
+    a = curve*0.01+1.5;
+    b = curve*-0.02;
+    c = curve*0.01-0.5;
+    d = 0.0625-curve*0.0025+curve*curve*0.000025;
+}
+out1 = processChannel(in1, 0);
+out2 = processChannel(in2, 1);
+frame++;
+if (frame >= vectorsize()) frame = 0;

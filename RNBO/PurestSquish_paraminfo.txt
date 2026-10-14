@@ -1,0 +1,39 @@
+PurestSquish — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/purestsquish-vst/
+
+What it is: the "Purest" family compressor: 5th-pass mu-style gain cell
+similar to VariMu's but tuned to be maximally clean and organic. It is
+designed as a 2-buss compressor with built-in auto makeup gain and a special
+"bass bloom" (BassBlm) feature: bass is pre-highpassed for the detector so
+low frequencies are compressed less aggressively while still sounding full.
+This RNBO port uses the original normalized 0..1 values.
+
+Parameters:
+
+- p_squish (Squish) 0..1, default 0.0
+  How hard the gain cell squashes. Internally threshold = 1.01 - (1 -(1 -
+  p/2)^4): the full range endpoint is around 1.01; the top 10-20% of the
+  knob is where the really hard squish lives. Default 0 = only the
+  base-signal path (near-bypass, but not exactly full bypass).
+  Guides: 0.3-0.5 gentle leveling; 0.7-0.9 a heavy transparent squash;
+  past 0.9 the internal makeup gain becomes extreme (designed for the
+  hardest 2-buss use).
+
+- p_bassblm (BassBlm) 0..1, default 0.0
+  Bass bloom. An iirAmount = p^4 / sampleRate highpass: increases
+  non-linearly, dramatically more effective toward 1.0. When cranked it
+  lets the low end bloom out of the compressed signal (kick/bass
+  interactions get extra weight while staying controlled). For use on the
+  2-buss or a group: small values already make the low end feel fuller.
+
+- p_output (Output) 0..1, default 1.0
+  Linear output trim (unity at 1.0). The auto makeup gain is inside the
+  algorithm, so use Output for level-matching, not density.
+
+- p_drywet (Dry/Wet) 0..1, default 1.0
+  Linear dry/wet blend.
+
+Musical notes: start Squish 0.4 on a drum buss, then raise BassBlm until
+the kick "carries" hard while the snare stays forward. The makeup gain is
+nonlinear (that is the whole character), so watch your level meters when
+pushing Squish past 0.8.

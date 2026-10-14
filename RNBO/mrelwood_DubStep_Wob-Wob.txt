@@ -1,0 +1,912 @@
+/* mrelwood_DubStep_Wob-Wob — RNBO codebox~ port of mrelwood source.
+ * Stereo in1/in2 -> out1/out2; original slider units and defaults.
+ * Graphics and GUI meters omitted. See RNBO/README.md and VALIDATION.md.
+ * desc: DubStep Wob-Wob  [mrelwood]
+ * 
+ * 
+ * 
+ * 
+ */
+// in3: continuous beat position (quarter notes). Pattern buttons default off.
+// Freq Min (Hz)
+@param({ min: 20, max: 1000 }) slider1 = 20;
+// Freq Max (Hz)
+@param({ min: 100, max: 20000 }) slider2 = 2000;
+// Offset (beats)
+@param({ min: -4, max: 4 }) slider3 = 0;
+// Steepness
+@param({ min: 3, max: 15 }) slider4 = 5;
+// Pattern button 1
+@param({ min: 0, max: 1 }) sliderstep1 = 0;
+// Pattern button 2
+@param({ min: 0, max: 1 }) sliderstep2 = 0;
+// Pattern button 3
+@param({ min: 0, max: 1 }) sliderstep3 = 0;
+// Pattern button 4
+@param({ min: 0, max: 1 }) sliderstep4 = 0;
+// Pattern button 5
+@param({ min: 0, max: 1 }) sliderstep5 = 0;
+// Pattern button 6
+@param({ min: 0, max: 1 }) sliderstep6 = 0;
+// Pattern button 7
+@param({ min: 0, max: 1 }) sliderstep7 = 0;
+// Pattern button 8
+@param({ min: 0, max: 1 }) sliderstep8 = 0;
+// Pattern button 9
+@param({ min: 0, max: 1 }) sliderstep9 = 0;
+// Pattern button 10
+@param({ min: 0, max: 1 }) sliderstep10 = 0;
+// Pattern button 11
+@param({ min: 0, max: 1 }) sliderstep11 = 0;
+// Pattern button 12
+@param({ min: 0, max: 1 }) sliderstep12 = 0;
+// Pattern button 13
+@param({ min: 0, max: 1 }) sliderstep13 = 0;
+// Pattern button 14
+@param({ min: 0, max: 1 }) sliderstep14 = 0;
+// Pattern button 15
+@param({ min: 0, max: 1 }) sliderstep15 = 0;
+// Pattern button 16
+@param({ min: 0, max: 1 }) sliderstep16 = 0;
+// Pattern button 17
+@param({ min: 0, max: 1 }) sliderstep17 = 0;
+// Pattern button 18
+@param({ min: 0, max: 1 }) sliderstep18 = 0;
+// Pattern button 19
+@param({ min: 0, max: 1 }) sliderstep19 = 0;
+// Pattern button 20
+@param({ min: 0, max: 1 }) sliderstep20 = 0;
+// Pattern button 21
+@param({ min: 0, max: 1 }) sliderstep21 = 0;
+// Pattern button 22
+@param({ min: 0, max: 1 }) sliderstep22 = 0;
+// Pattern button 23
+@param({ min: 0, max: 1 }) sliderstep23 = 0;
+// Pattern button 24
+@param({ min: 0, max: 1 }) sliderstep24 = 0;
+// Pattern button 25
+@param({ min: 0, max: 1 }) sliderstep25 = 0;
+// Pattern button 26
+@param({ min: 0, max: 1 }) sliderstep26 = 0;
+// Pattern button 27
+@param({ min: 0, max: 1 }) sliderstep27 = 0;
+// Pattern button 28
+@param({ min: 0, max: 1 }) sliderstep28 = 0;
+// Pattern button 29
+@param({ min: 0, max: 1 }) sliderstep29 = 0;
+// Pattern button 30
+@param({ min: 0, max: 1 }) sliderstep30 = 0;
+// Pattern button 31
+@param({ min: 0, max: 1 }) sliderstep31 = 0;
+// Pattern button 32
+@param({ min: 0, max: 1 }) sliderstep32 = 0;
+// Pattern button 33
+@param({ min: 0, max: 1 }) sliderstep33 = 0;
+// Pattern button 34
+@param({ min: 0, max: 1 }) sliderstep34 = 0;
+// Pattern button 35
+@param({ min: 0, max: 1 }) sliderstep35 = 0;
+// Pattern button 36
+@param({ min: 0, max: 1 }) sliderstep36 = 0;
+// Pattern button 37
+@param({ min: 0, max: 1 }) sliderstep37 = 0;
+// Pattern button 38
+@param({ min: 0, max: 1 }) sliderstep38 = 0;
+// Pattern button 39
+@param({ min: 0, max: 1 }) sliderstep39 = 0;
+// Pattern button 40
+@param({ min: 0, max: 1 }) sliderstep40 = 0;
+// Pattern button 41
+@param({ min: 0, max: 1 }) sliderstep41 = 0;
+// Pattern button 42
+@param({ min: 0, max: 1 }) sliderstep42 = 0;
+// Pattern button 43
+@param({ min: 0, max: 1 }) sliderstep43 = 0;
+// Pattern button 44
+@param({ min: 0, max: 1 }) sliderstep44 = 0;
+// Pattern button 45
+@param({ min: 0, max: 1 }) sliderstep45 = 0;
+// Pattern button 46
+@param({ min: 0, max: 1 }) sliderstep46 = 0;
+// Pattern button 47
+@param({ min: 0, max: 1 }) sliderstep47 = 0;
+// Pattern button 48
+@param({ min: 0, max: 1 }) sliderstep48 = 0;
+// Pattern button 49
+@param({ min: 0, max: 1 }) sliderstep49 = 0;
+// Pattern button 50
+@param({ min: 0, max: 1 }) sliderstep50 = 0;
+// Pattern button 51
+@param({ min: 0, max: 1 }) sliderstep51 = 0;
+// Pattern button 52
+@param({ min: 0, max: 1 }) sliderstep52 = 0;
+// Pattern button 53
+@param({ min: 0, max: 1 }) sliderstep53 = 0;
+// Pattern button 54
+@param({ min: 0, max: 1 }) sliderstep54 = 0;
+// Pattern button 55
+@param({ min: 0, max: 1 }) sliderstep55 = 0;
+// Pattern button 56
+@param({ min: 0, max: 1 }) sliderstep56 = 0;
+@state ram = new FixedFloat64Array(57);
+@state s_initialized = 0;
+@state frame: Int = 0;
+@state prepared = 0;
+@state s_beat4 = 0;
+@state s_bufena = 0;
+@state s_buff = 0;
+@state s_fmax = 0;
+@state s_fmin = 0;
+@state s_fran = 0;
+@state s_freq1 = 0;
+@state s_gmax = 0;
+@state s_lp_L_out = 0;
+@state s_lp_L_p1_in1 = 0;
+@state s_lp_L_p1_in2 = 0;
+@state s_lp_L_p1_out = 0;
+@state s_lp_L_p1_out1 = 0;
+@state s_lp_L_p1_out2 = 0;
+@state s_lp_L_p2_in1 = 0;
+@state s_lp_L_p2_in2 = 0;
+@state s_lp_L_p2_out = 0;
+@state s_lp_L_p2_out1 = 0;
+@state s_lp_L_p2_out2 = 0;
+@state s_lp_L_p3_in1 = 0;
+@state s_lp_L_p3_in2 = 0;
+@state s_lp_L_p3_out = 0;
+@state s_lp_L_p3_out1 = 0;
+@state s_lp_L_p3_out2 = 0;
+@state s_lp_L_p4_in1 = 0;
+@state s_lp_L_p4_in2 = 0;
+@state s_lp_L_p4_out = 0;
+@state s_lp_L_p4_out1 = 0;
+@state s_lp_L_p4_out2 = 0;
+@state s_lp_L_p5_in1 = 0;
+@state s_lp_L_p5_in2 = 0;
+@state s_lp_L_p5_out = 0;
+@state s_lp_L_p5_out1 = 0;
+@state s_lp_L_p5_out2 = 0;
+@state s_lp_Q = 0;
+@state s_lp_R_out = 0;
+@state s_lp_R_p1_in1 = 0;
+@state s_lp_R_p1_in2 = 0;
+@state s_lp_R_p1_out = 0;
+@state s_lp_R_p1_out1 = 0;
+@state s_lp_R_p1_out2 = 0;
+@state s_lp_R_p2_in1 = 0;
+@state s_lp_R_p2_in2 = 0;
+@state s_lp_R_p2_out = 0;
+@state s_lp_R_p2_out1 = 0;
+@state s_lp_R_p2_out2 = 0;
+@state s_lp_R_p3_in1 = 0;
+@state s_lp_R_p3_in2 = 0;
+@state s_lp_R_p3_out = 0;
+@state s_lp_R_p3_out1 = 0;
+@state s_lp_R_p3_out2 = 0;
+@state s_lp_R_p4_in1 = 0;
+@state s_lp_R_p4_in2 = 0;
+@state s_lp_R_p4_out = 0;
+@state s_lp_R_p4_out1 = 0;
+@state s_lp_R_p4_out2 = 0;
+@state s_lp_R_p5_in1 = 0;
+@state s_lp_R_p5_in2 = 0;
+@state s_lp_R_p5_out = 0;
+@state s_lp_R_p5_out1 = 0;
+@state s_lp_R_p5_out2 = 0;
+@state s_lp__wid = 0;
+@state s_lp_a0 = 0;
+@state s_lp_a1 = 0;
+@state s_lp_a1a0 = 0;
+@state s_lp_a2 = 0;
+@state s_lp_a2a0 = 0;
+@state s_lp_alpha = 0;
+@state s_lp_b0 = 0;
+@state s_lp_b0a0 = 0;
+@state s_lp_b1 = 0;
+@state s_lp_b1a0 = 0;
+@state s_lp_b2 = 0;
+@state s_lp_b2a0 = 0;
+@state s_lp_beta = 0;
+@state s_lp_cQ = 0;
+@state s_lp_ca0 = 0;
+@state s_lp_ca1 = 0;
+@state s_lp_ca2 = 0;
+@state s_lp_cb0 = 0;
+@state s_lp_cb1 = 0;
+@state s_lp_cb2 = 0;
+@state s_lp_cosf = 0;
+@state s_lp_f = 0;
+@state s_lp_gdb = 0;
+@state s_lp_gexp = 0;
+@state s_lp_gmul = 0;
+@state s_lp_omega = 0;
+@state s_lp_poles = 0;
+@state s_lp_shape = 0;
+@state s_lp_sinf = 0;
+@state s_lp_w = 0;
+@state s_lp_w1 = 0;
+@state s_lp_wmul = 0;
+@state s_nei = 0;
+@state s_off = 0;
+@state s_offs = 0;
+@state s_pi = 0;
+@state s_s = 0;
+@state s_spl0 = 0;
+@state s_spl1 = 0;
+@state s_steep = 0;
+// EEL division by zero returns zero; RNBO arithmetic does not.
+function eelDivide(a,b) { return b == 0 ? 0 : a/b; }
+function fn__curve(arg_offs) {
+let tmp63 = eelDivide((in3 + arg_offs),4);
+s_beat4 = ((in3 + arg_offs) - (floor(tmp63) * 4));
+let tmp64 = 0;
+let tmp65 = (1 - (s_beat4 * (s_steep * .4)));
+let tmp66 = 0;
+let tmp67 = ((s_beat4 * (s_steep * .4)) - (((s_steep * .4) * 4) - 1));
+return pow((maximum(tmp64, tmp65) + maximum(tmp66, tmp67)),s_steep);
+}
+
+function fn__upeq() {
+let tmp71 = 4;
+let tmp72 = (s_fmin + (s_fran * s_freq1));
+let tmp73 = 0;
+let tmp74 = 1;
+return fn_lp_eqini(tmp71, tmp72, tmp73, tmp74);
+}
+
+function fn_lp_eqini(arg_shape, arg_f, arg_ga, arg_w) {
+s_lp_gdb = arg_ga;
+let tmp120 = 0;
+if (((arg_shape == 0) || (arg_shape == 4))) {
+let tmp75 = 1;
+let tmp76 = arg_w;
+s_lp_w1 = maximum(tmp75, tmp76);
+s_lp_Q = .7;
+let tmp77 = arg_w;
+s_lp_poles = ceil(tmp77);
+s_lp_omega = eelDivide(((2 * s_pi) * arg_f),samplerate());
+let tmp78 = s_lp_omega;
+s_lp_sinf = sin(tmp78);
+let tmp79 = s_lp_omega;
+s_lp_cosf = cos(tmp79);
+s_lp_alpha = eelDivide(s_lp_sinf,(2 * s_lp_Q));
+let tmp81 = 0;
+if (arg_shape == 0) {
+s_lp_b0 = eelDivide((1 + s_lp_cosf),2);
+s_lp_b1 = (0 - (1 + s_lp_cosf));
+s_lp_b2 = eelDivide((1 + s_lp_cosf),2);
+s_lp_a0 = (1 + s_lp_alpha);
+s_lp_a1 = ((0 - 2) * s_lp_cosf);
+s_lp_a2 = (1 - s_lp_alpha);
+tmp81 = s_lp_a2;
+} else {
+let tmp80 = 0;
+if (arg_shape == 4) {
+s_lp_b0 = eelDivide((1 - s_lp_cosf),2);
+s_lp_b1 = (1 - s_lp_cosf);
+s_lp_b2 = eelDivide((1 - s_lp_cosf),2);
+s_lp_a0 = (1 + s_lp_alpha);
+s_lp_a1 = ((0 - 2) * s_lp_cosf);
+s_lp_a2 = (1 - s_lp_alpha);
+tmp80 = s_lp_a2;
+} else {
+tmp80 = 0;
+}
+tmp81 = tmp80;
+}
+tmp120 = tmp81;
+} else {
+s_lp_omega = eelDivide(((2 * s_pi) * arg_f),samplerate());
+let tmp82 = s_lp_omega;
+s_lp_sinf = sin(tmp82);
+let tmp83 = s_lp_omega;
+s_lp_cosf = cos(tmp83);
+let tmp119 = 0;
+if (arg_shape == 2) {
+let tmp84 = 40;
+let tmp85 = (0 - 40);
+let tmp86 = arg_ga;
+let tmp87 = maximum(tmp85, tmp86);
+arg_ga = minimum(tmp84, tmp87);
+let tmp88 = 0;
+let tmp89: Int = trunc(s_buff+(s_nei));
+let tmp90 = ram[tmp89];
+let tmp91 = eelDivide((log10(maximum(1e-30, tmp90)) - 3.9),.4);
+s_lp_wmul = (arg_w * (1 + ((2.5 - (arg_w * .15)) * pow(maximum(tmp88, tmp91),4))));
+s_lp_Q = eelDivide(1.5,(s_lp_wmul + .1));
+s_lp_alpha = eelDivide(s_lp_sinf,(2 * s_lp_Q));
+let tmp92 = 1;
+let tmp93 = arg_ga;
+let tmp94 = eelDivide(40,abs(tmp93));
+arg_ga *= minimum(tmp92, tmp94);
+let tmp95 = pow(10,eelDivide(arg_ga,20));
+s_lp_gmul = sqrt(tmp95);
+s_lp_b0 = (1 + (s_lp_alpha * s_lp_gmul));
+s_lp_b1 = ((0 - 2) * s_lp_cosf);
+s_lp_b2 = (1 - (s_lp_alpha * s_lp_gmul));
+s_lp_a0 = (1 + eelDivide(s_lp_alpha,s_lp_gmul));
+s_lp_a1 = ((0 - 2) * s_lp_cosf);
+s_lp_a2 = (1 - eelDivide(s_lp_alpha,s_lp_gmul));
+s_lp_cQ = eelDivide(15,((s_lp_wmul * .7) + 1));
+s_lp_alpha = eelDivide(s_lp_sinf,(2 * s_lp_cQ));
+s_lp_cb0 = s_lp_alpha;
+s_lp_cb1 = 0;
+s_lp_cb2 = (0 - s_lp_alpha);
+s_lp_ca0 = (1 + s_lp_alpha);
+s_lp_ca1 = ((0 - 2) * s_lp_cosf);
+s_lp_ca2 = (1 - s_lp_alpha);
+tmp119 = s_lp_ca2;
+} else {
+let tmp118 = 0;
+if (((arg_shape == 1) || (arg_shape == 3))) {
+let tmp96 = 30;
+let tmp97 = (0 - 30);
+let tmp98 = arg_ga;
+let tmp99 = maximum(tmp97, tmp98);
+arg_ga = minimum(tmp96, tmp99);
+let tmp100 = arg_w;
+let tmp101 = .01;
+let tmp102 = arg_ga;
+let tmp103 = (.2 + (.05 * (abs(tmp102) - 20)));
+let tmp104 = maximum(tmp101, tmp103);
+arg_w = maximum(tmp100, tmp104);
+s_lp__wid = arg_w;
+s_gmax = 30;
+s_lp_w1 = eelDivide(1,(eelDivide((arg_w - 1),2) + 1));
+s_lp_gexp = pow(10,eelDivide(arg_ga,40));
+let tmp105 = s_lp_gexp;
+let tmp106 = (((s_lp_gexp + eelDivide(1,s_lp_gexp)) * (eelDivide(1,s_lp_w1) - 1)) + 2);
+s_lp_beta = (sqrt(tmp105) * sqrt(tmp106));
+let tmp107 = pow(10,eelDivide(arg_ga,20));
+s_lp_gmul = sqrt(tmp107);
+let tmp117 = 0;
+if (arg_shape == 1) {
+s_lp_b0 = (s_lp_gmul * (((s_lp_gmul + 1) - ((s_lp_gmul - 1) * s_lp_cosf)) + (s_lp_beta * s_lp_sinf)));
+s_lp_b1 = ((2 * s_lp_gmul) * ((s_lp_gmul - 1) - ((s_lp_gmul + 1) * s_lp_cosf)));
+s_lp_b2 = (s_lp_gmul * (((s_lp_gmul + 1) - ((s_lp_gmul - 1) * s_lp_cosf)) - (s_lp_beta * s_lp_sinf)));
+s_lp_a0 = (((s_lp_gmul + 1) + ((s_lp_gmul - 1) * s_lp_cosf)) + (s_lp_beta * s_lp_sinf));
+s_lp_a1 = ((0 - 2) * ((s_lp_gmul - 1) + ((s_lp_gmul + 1) * s_lp_cosf)));
+s_lp_a2 = (((s_lp_gmul + 1) + ((s_lp_gmul - 1) * s_lp_cosf)) - (s_lp_beta * s_lp_sinf));
+let tmp108 = 30;
+let tmp109 = eelDivide((arg_f * .7),(1 + (arg_w * .1)));
+s_lp_omega = eelDivide(((2 * s_pi) * maximum(tmp108, tmp109)),samplerate());
+let tmp110 = s_lp_omega;
+s_lp_sinf = sin(tmp110);
+let tmp111 = s_lp_omega;
+s_lp_cosf = cos(tmp111);
+s_lp_cQ = eelDivide(.8,(1 + eelDivide(arg_w,6)));
+s_lp_alpha = eelDivide(s_lp_sinf,(2 * s_lp_cQ));
+s_lp_cb0 = eelDivide((1 - s_lp_cosf),2);
+s_lp_cb1 = (1 - s_lp_cosf);
+s_lp_cb2 = eelDivide((1 - s_lp_cosf),2);
+s_lp_ca0 = (1 + s_lp_alpha);
+s_lp_ca1 = ((0 - 2) * s_lp_cosf);
+s_lp_ca2 = (1 - s_lp_alpha);
+tmp117 = s_lp_ca2;
+} else {
+let tmp116 = 0;
+if (arg_shape == 3) {
+s_lp_b0 = (s_lp_gmul * (((s_lp_gmul + 1) + ((s_lp_gmul - 1) * s_lp_cosf)) + (s_lp_beta * s_lp_sinf)));
+s_lp_b1 = (((0 - 2) * s_lp_gmul) * ((s_lp_gmul - 1) + ((s_lp_gmul + 1) * s_lp_cosf)));
+s_lp_b2 = (s_lp_gmul * (((s_lp_gmul + 1) + ((s_lp_gmul - 1) * s_lp_cosf)) - (s_lp_beta * s_lp_sinf)));
+s_lp_a0 = (((s_lp_gmul + 1) - ((s_lp_gmul - 1) * s_lp_cosf)) + (s_lp_beta * s_lp_sinf));
+s_lp_a1 = (2 * ((s_lp_gmul - 1) - ((s_lp_gmul + 1) * s_lp_cosf)));
+s_lp_a2 = (((s_lp_gmul + 1) - ((s_lp_gmul - 1) * s_lp_cosf)) - (s_lp_beta * s_lp_sinf));
+let tmp112 = (arg_f + 3000);
+let tmp113 = ((arg_f * 1.5) * (1 + (arg_w * .1)));
+s_lp_omega = eelDivide(((2 * s_pi) * minimum(tmp112, tmp113)),samplerate());
+let tmp114 = s_lp_omega;
+s_lp_sinf = sin(tmp114);
+let tmp115 = s_lp_omega;
+s_lp_cosf = cos(tmp115);
+s_lp_cQ = eelDivide(.8,(1 + eelDivide(arg_w,6)));
+s_lp_alpha = eelDivide(s_lp_sinf,(2 * s_lp_cQ));
+s_lp_cb0 = eelDivide((1 + s_lp_cosf),2);
+s_lp_cb1 = (0 - (1 + s_lp_cosf));
+s_lp_cb2 = eelDivide((1 + s_lp_cosf),2);
+s_lp_ca0 = (1 + s_lp_alpha);
+s_lp_ca1 = ((0 - 2) * s_lp_cosf);
+s_lp_ca2 = (1 - s_lp_alpha);
+tmp116 = s_lp_ca2;
+} else {
+tmp116 = 0;
+}
+tmp117 = tmp116;
+}
+tmp118 = tmp117;
+} else {
+tmp118 = 0;
+}
+tmp119 = tmp118;
+}
+tmp120 = tmp119;
+}
+s_lp_b0a0 = eelDivide(s_lp_b0,s_lp_a0);
+s_lp_b1a0 = eelDivide(s_lp_b1,s_lp_a0);
+s_lp_b2a0 = eelDivide(s_lp_b2,s_lp_a0);
+s_lp_a1a0 = eelDivide(s_lp_a1,s_lp_a0);
+s_lp_a2a0 = eelDivide(s_lp_a2,s_lp_a0);
+s_lp_shape = arg_shape;
+s_lp_f = arg_f;
+s_lp_w = arg_w;
+return s_lp_w;
+}
+
+function fn_lp_L_eq(arg_in) {
+let tmp132 = 0;
+if (((s_lp_shape == 0) || (s_lp_shape == 4))) {
+let tmp122 = arg_in;
+s_lp_L_out = fn_lp_L_p1_eqpole(tmp122);
+let tmp124 = 0;
+if (s_lp_poles > 1) {
+let tmp123 = s_lp_L_out;
+s_lp_L_out = fn_lp_L_p2_eqpole(tmp123);
+tmp124 = s_lp_L_out;
+} else {
+tmp124 = 0;
+}
+let tmp126 = 0;
+if (s_lp_poles > 2) {
+let tmp125 = s_lp_L_out;
+s_lp_L_out = fn_lp_L_p3_eqpole(tmp125);
+tmp126 = s_lp_L_out;
+} else {
+tmp126 = 0;
+}
+let tmp128 = 0;
+if (s_lp_poles > 3) {
+let tmp127 = s_lp_L_out;
+s_lp_L_out = fn_lp_L_p4_eqpole(tmp127);
+tmp128 = s_lp_L_out;
+} else {
+tmp128 = 0;
+}
+let tmp130 = 0;
+if (s_lp_poles > 4) {
+let tmp129 = s_lp_L_out;
+s_lp_L_out = fn_lp_L_p5_eqpole(tmp129);
+tmp130 = s_lp_L_out;
+} else {
+tmp130 = 0;
+}
+tmp132 = tmp130;
+} else {
+let tmp131 = arg_in;
+s_lp_L_out = fn_lp_L_p1_eqpole(tmp131);
+tmp132 = s_lp_L_out;
+}
+return s_lp_L_out;
+}
+
+function fn_lp_L_p1_eqpole(arg_in) {
+s_lp_L_p1_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_L_p1_in1)) + (s_lp_b2a0 * s_lp_L_p1_in2)) - (s_lp_a1a0 * s_lp_L_p1_out1)) - (s_lp_a2a0 * s_lp_L_p1_out2));
+s_lp_L_p1_in2 = s_lp_L_p1_in1;
+s_lp_L_p1_in1 = arg_in;
+s_lp_L_p1_out2 = s_lp_L_p1_out1;
+s_lp_L_p1_out1 = s_lp_L_p1_out;
+return s_lp_L_p1_out1;
+}
+
+function fn_lp_L_p2_eqpole(arg_in) {
+s_lp_L_p2_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_L_p2_in1)) + (s_lp_b2a0 * s_lp_L_p2_in2)) - (s_lp_a1a0 * s_lp_L_p2_out1)) - (s_lp_a2a0 * s_lp_L_p2_out2));
+s_lp_L_p2_in2 = s_lp_L_p2_in1;
+s_lp_L_p2_in1 = arg_in;
+s_lp_L_p2_out2 = s_lp_L_p2_out1;
+s_lp_L_p2_out1 = s_lp_L_p2_out;
+return s_lp_L_p2_out1;
+}
+
+function fn_lp_L_p3_eqpole(arg_in) {
+s_lp_L_p3_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_L_p3_in1)) + (s_lp_b2a0 * s_lp_L_p3_in2)) - (s_lp_a1a0 * s_lp_L_p3_out1)) - (s_lp_a2a0 * s_lp_L_p3_out2));
+s_lp_L_p3_in2 = s_lp_L_p3_in1;
+s_lp_L_p3_in1 = arg_in;
+s_lp_L_p3_out2 = s_lp_L_p3_out1;
+s_lp_L_p3_out1 = s_lp_L_p3_out;
+return s_lp_L_p3_out1;
+}
+
+function fn_lp_L_p4_eqpole(arg_in) {
+s_lp_L_p4_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_L_p4_in1)) + (s_lp_b2a0 * s_lp_L_p4_in2)) - (s_lp_a1a0 * s_lp_L_p4_out1)) - (s_lp_a2a0 * s_lp_L_p4_out2));
+s_lp_L_p4_in2 = s_lp_L_p4_in1;
+s_lp_L_p4_in1 = arg_in;
+s_lp_L_p4_out2 = s_lp_L_p4_out1;
+s_lp_L_p4_out1 = s_lp_L_p4_out;
+return s_lp_L_p4_out1;
+}
+
+function fn_lp_L_p5_eqpole(arg_in) {
+s_lp_L_p5_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_L_p5_in1)) + (s_lp_b2a0 * s_lp_L_p5_in2)) - (s_lp_a1a0 * s_lp_L_p5_out1)) - (s_lp_a2a0 * s_lp_L_p5_out2));
+s_lp_L_p5_in2 = s_lp_L_p5_in1;
+s_lp_L_p5_in1 = arg_in;
+s_lp_L_p5_out2 = s_lp_L_p5_out1;
+s_lp_L_p5_out1 = s_lp_L_p5_out;
+return s_lp_L_p5_out1;
+}
+
+function fn_lp_R_eq(arg_in) {
+let tmp144 = 0;
+if (((s_lp_shape == 0) || (s_lp_shape == 4))) {
+let tmp134 = arg_in;
+s_lp_R_out = fn_lp_R_p1_eqpole(tmp134);
+let tmp136 = 0;
+if (s_lp_poles > 1) {
+let tmp135 = s_lp_R_out;
+s_lp_R_out = fn_lp_R_p2_eqpole(tmp135);
+tmp136 = s_lp_R_out;
+} else {
+tmp136 = 0;
+}
+let tmp138 = 0;
+if (s_lp_poles > 2) {
+let tmp137 = s_lp_R_out;
+s_lp_R_out = fn_lp_R_p3_eqpole(tmp137);
+tmp138 = s_lp_R_out;
+} else {
+tmp138 = 0;
+}
+let tmp140 = 0;
+if (s_lp_poles > 3) {
+let tmp139 = s_lp_R_out;
+s_lp_R_out = fn_lp_R_p4_eqpole(tmp139);
+tmp140 = s_lp_R_out;
+} else {
+tmp140 = 0;
+}
+let tmp142 = 0;
+if (s_lp_poles > 4) {
+let tmp141 = s_lp_R_out;
+s_lp_R_out = fn_lp_R_p5_eqpole(tmp141);
+tmp142 = s_lp_R_out;
+} else {
+tmp142 = 0;
+}
+tmp144 = tmp142;
+} else {
+let tmp143 = arg_in;
+s_lp_R_out = fn_lp_R_p1_eqpole(tmp143);
+tmp144 = s_lp_R_out;
+}
+return s_lp_R_out;
+}
+
+function fn_lp_R_p1_eqpole(arg_in) {
+s_lp_R_p1_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_R_p1_in1)) + (s_lp_b2a0 * s_lp_R_p1_in2)) - (s_lp_a1a0 * s_lp_R_p1_out1)) - (s_lp_a2a0 * s_lp_R_p1_out2));
+s_lp_R_p1_in2 = s_lp_R_p1_in1;
+s_lp_R_p1_in1 = arg_in;
+s_lp_R_p1_out2 = s_lp_R_p1_out1;
+s_lp_R_p1_out1 = s_lp_R_p1_out;
+return s_lp_R_p1_out1;
+}
+
+function fn_lp_R_p2_eqpole(arg_in) {
+s_lp_R_p2_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_R_p2_in1)) + (s_lp_b2a0 * s_lp_R_p2_in2)) - (s_lp_a1a0 * s_lp_R_p2_out1)) - (s_lp_a2a0 * s_lp_R_p2_out2));
+s_lp_R_p2_in2 = s_lp_R_p2_in1;
+s_lp_R_p2_in1 = arg_in;
+s_lp_R_p2_out2 = s_lp_R_p2_out1;
+s_lp_R_p2_out1 = s_lp_R_p2_out;
+return s_lp_R_p2_out1;
+}
+
+function fn_lp_R_p3_eqpole(arg_in) {
+s_lp_R_p3_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_R_p3_in1)) + (s_lp_b2a0 * s_lp_R_p3_in2)) - (s_lp_a1a0 * s_lp_R_p3_out1)) - (s_lp_a2a0 * s_lp_R_p3_out2));
+s_lp_R_p3_in2 = s_lp_R_p3_in1;
+s_lp_R_p3_in1 = arg_in;
+s_lp_R_p3_out2 = s_lp_R_p3_out1;
+s_lp_R_p3_out1 = s_lp_R_p3_out;
+return s_lp_R_p3_out1;
+}
+
+function fn_lp_R_p4_eqpole(arg_in) {
+s_lp_R_p4_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_R_p4_in1)) + (s_lp_b2a0 * s_lp_R_p4_in2)) - (s_lp_a1a0 * s_lp_R_p4_out1)) - (s_lp_a2a0 * s_lp_R_p4_out2));
+s_lp_R_p4_in2 = s_lp_R_p4_in1;
+s_lp_R_p4_in1 = arg_in;
+s_lp_R_p4_out2 = s_lp_R_p4_out1;
+s_lp_R_p4_out1 = s_lp_R_p4_out;
+return s_lp_R_p4_out1;
+}
+
+function fn_lp_R_p5_eqpole(arg_in) {
+s_lp_R_p5_out = (((((s_lp_b0a0 * arg_in) + (s_lp_b1a0 * s_lp_R_p5_in1)) + (s_lp_b2a0 * s_lp_R_p5_in2)) - (s_lp_a1a0 * s_lp_R_p5_out1)) - (s_lp_a2a0 * s_lp_R_p5_out2));
+s_lp_R_p5_in2 = s_lp_R_p5_in1;
+s_lp_R_p5_in1 = arg_in;
+s_lp_R_p5_out2 = s_lp_R_p5_out1;
+s_lp_R_p5_out1 = s_lp_R_p5_out;
+return s_lp_R_p5_out1;
+}
+function dspsetup() { frame = 0; prepared = 0; controlsReady = 0; }
+if (prepared == 0) {
+if (prepared == 0 && s_initialized == 0) {
+s_pi = 3.14159265358;
+
+s_initialized = 1;
+}
+prepared = 1;
+}
+@state previousControls = new FixedFloat64Array(60);
+@state controlsReady = 0;
+if (frame == 0) {
+let changed = controlsReady == 0;
+if (previousControls[0] != slider1) changed = 1;
+previousControls[0] = slider1;
+if (previousControls[1] != slider2) changed = 1;
+previousControls[1] = slider2;
+if (previousControls[2] != slider3) changed = 1;
+previousControls[2] = slider3;
+if (previousControls[3] != slider4) changed = 1;
+previousControls[3] = slider4;
+if (previousControls[4] != sliderstep1) changed = 1;
+previousControls[4] = sliderstep1;
+if (previousControls[5] != sliderstep2) changed = 1;
+previousControls[5] = sliderstep2;
+if (previousControls[6] != sliderstep3) changed = 1;
+previousControls[6] = sliderstep3;
+if (previousControls[7] != sliderstep4) changed = 1;
+previousControls[7] = sliderstep4;
+if (previousControls[8] != sliderstep5) changed = 1;
+previousControls[8] = sliderstep5;
+if (previousControls[9] != sliderstep6) changed = 1;
+previousControls[9] = sliderstep6;
+if (previousControls[10] != sliderstep7) changed = 1;
+previousControls[10] = sliderstep7;
+if (previousControls[11] != sliderstep8) changed = 1;
+previousControls[11] = sliderstep8;
+if (previousControls[12] != sliderstep9) changed = 1;
+previousControls[12] = sliderstep9;
+if (previousControls[13] != sliderstep10) changed = 1;
+previousControls[13] = sliderstep10;
+if (previousControls[14] != sliderstep11) changed = 1;
+previousControls[14] = sliderstep11;
+if (previousControls[15] != sliderstep12) changed = 1;
+previousControls[15] = sliderstep12;
+if (previousControls[16] != sliderstep13) changed = 1;
+previousControls[16] = sliderstep13;
+if (previousControls[17] != sliderstep14) changed = 1;
+previousControls[17] = sliderstep14;
+if (previousControls[18] != sliderstep15) changed = 1;
+previousControls[18] = sliderstep15;
+if (previousControls[19] != sliderstep16) changed = 1;
+previousControls[19] = sliderstep16;
+if (previousControls[20] != sliderstep17) changed = 1;
+previousControls[20] = sliderstep17;
+if (previousControls[21] != sliderstep18) changed = 1;
+previousControls[21] = sliderstep18;
+if (previousControls[22] != sliderstep19) changed = 1;
+previousControls[22] = sliderstep19;
+if (previousControls[23] != sliderstep20) changed = 1;
+previousControls[23] = sliderstep20;
+if (previousControls[24] != sliderstep21) changed = 1;
+previousControls[24] = sliderstep21;
+if (previousControls[25] != sliderstep22) changed = 1;
+previousControls[25] = sliderstep22;
+if (previousControls[26] != sliderstep23) changed = 1;
+previousControls[26] = sliderstep23;
+if (previousControls[27] != sliderstep24) changed = 1;
+previousControls[27] = sliderstep24;
+if (previousControls[28] != sliderstep25) changed = 1;
+previousControls[28] = sliderstep25;
+if (previousControls[29] != sliderstep26) changed = 1;
+previousControls[29] = sliderstep26;
+if (previousControls[30] != sliderstep27) changed = 1;
+previousControls[30] = sliderstep27;
+if (previousControls[31] != sliderstep28) changed = 1;
+previousControls[31] = sliderstep28;
+if (previousControls[32] != sliderstep29) changed = 1;
+previousControls[32] = sliderstep29;
+if (previousControls[33] != sliderstep30) changed = 1;
+previousControls[33] = sliderstep30;
+if (previousControls[34] != sliderstep31) changed = 1;
+previousControls[34] = sliderstep31;
+if (previousControls[35] != sliderstep32) changed = 1;
+previousControls[35] = sliderstep32;
+if (previousControls[36] != sliderstep33) changed = 1;
+previousControls[36] = sliderstep33;
+if (previousControls[37] != sliderstep34) changed = 1;
+previousControls[37] = sliderstep34;
+if (previousControls[38] != sliderstep35) changed = 1;
+previousControls[38] = sliderstep35;
+if (previousControls[39] != sliderstep36) changed = 1;
+previousControls[39] = sliderstep36;
+if (previousControls[40] != sliderstep37) changed = 1;
+previousControls[40] = sliderstep37;
+if (previousControls[41] != sliderstep38) changed = 1;
+previousControls[41] = sliderstep38;
+if (previousControls[42] != sliderstep39) changed = 1;
+previousControls[42] = sliderstep39;
+if (previousControls[43] != sliderstep40) changed = 1;
+previousControls[43] = sliderstep40;
+if (previousControls[44] != sliderstep41) changed = 1;
+previousControls[44] = sliderstep41;
+if (previousControls[45] != sliderstep42) changed = 1;
+previousControls[45] = sliderstep42;
+if (previousControls[46] != sliderstep43) changed = 1;
+previousControls[46] = sliderstep43;
+if (previousControls[47] != sliderstep44) changed = 1;
+previousControls[47] = sliderstep44;
+if (previousControls[48] != sliderstep45) changed = 1;
+previousControls[48] = sliderstep45;
+if (previousControls[49] != sliderstep46) changed = 1;
+previousControls[49] = sliderstep46;
+if (previousControls[50] != sliderstep47) changed = 1;
+previousControls[50] = sliderstep47;
+if (previousControls[51] != sliderstep48) changed = 1;
+previousControls[51] = sliderstep48;
+if (previousControls[52] != sliderstep49) changed = 1;
+previousControls[52] = sliderstep49;
+if (previousControls[53] != sliderstep50) changed = 1;
+previousControls[53] = sliderstep50;
+if (previousControls[54] != sliderstep51) changed = 1;
+previousControls[54] = sliderstep51;
+if (previousControls[55] != sliderstep52) changed = 1;
+previousControls[55] = sliderstep52;
+if (previousControls[56] != sliderstep53) changed = 1;
+previousControls[56] = sliderstep53;
+if (previousControls[57] != sliderstep54) changed = 1;
+previousControls[57] = sliderstep54;
+if (previousControls[58] != sliderstep55) changed = 1;
+previousControls[58] = sliderstep55;
+if (previousControls[59] != sliderstep56) changed = 1;
+previousControls[59] = sliderstep56;
+if (changed) {
+s_fmin = slider1;
+let tmp1 = (slider1 + 10);
+let tmp2 = slider2;
+s_fmax = maximum(tmp1, tmp2);
+s_fran = (s_fmax - s_fmin);
+s_offs = slider3;
+s_steep = slider4;
+let tmp3: Int = trunc(s_bufena+(1));
+ram[tmp3] = sliderstep1;
+let tmp4: Int = trunc(s_bufena+(2));
+ram[tmp4] = sliderstep2;
+let tmp5: Int = trunc(s_bufena+(3));
+ram[tmp5] = sliderstep3;
+let tmp6: Int = trunc(s_bufena+(4));
+ram[tmp6] = sliderstep4;
+let tmp7: Int = trunc(s_bufena+(5));
+ram[tmp7] = sliderstep5;
+let tmp8: Int = trunc(s_bufena+(6));
+ram[tmp8] = sliderstep6;
+let tmp9: Int = trunc(s_bufena+(7));
+ram[tmp9] = sliderstep7;
+let tmp10: Int = trunc(s_bufena+(8));
+ram[tmp10] = sliderstep8;
+let tmp11: Int = trunc(s_bufena+(9));
+ram[tmp11] = sliderstep9;
+let tmp12: Int = trunc(s_bufena+(10));
+ram[tmp12] = sliderstep10;
+let tmp13: Int = trunc(s_bufena+(11));
+ram[tmp13] = sliderstep11;
+let tmp14: Int = trunc(s_bufena+(12));
+ram[tmp14] = sliderstep12;
+let tmp15: Int = trunc(s_bufena+(13));
+ram[tmp15] = sliderstep13;
+let tmp16: Int = trunc(s_bufena+(14));
+ram[tmp16] = sliderstep14;
+let tmp17: Int = trunc(s_bufena+(15));
+ram[tmp17] = sliderstep15;
+let tmp18: Int = trunc(s_bufena+(16));
+ram[tmp18] = sliderstep16;
+let tmp19: Int = trunc(s_bufena+(17));
+ram[tmp19] = sliderstep17;
+let tmp20: Int = trunc(s_bufena+(18));
+ram[tmp20] = sliderstep18;
+let tmp21: Int = trunc(s_bufena+(19));
+ram[tmp21] = sliderstep19;
+let tmp22: Int = trunc(s_bufena+(20));
+ram[tmp22] = sliderstep20;
+let tmp23: Int = trunc(s_bufena+(21));
+ram[tmp23] = sliderstep21;
+let tmp24: Int = trunc(s_bufena+(22));
+ram[tmp24] = sliderstep22;
+let tmp25: Int = trunc(s_bufena+(23));
+ram[tmp25] = sliderstep23;
+let tmp26: Int = trunc(s_bufena+(24));
+ram[tmp26] = sliderstep24;
+let tmp27: Int = trunc(s_bufena+(25));
+ram[tmp27] = sliderstep25;
+let tmp28: Int = trunc(s_bufena+(26));
+ram[tmp28] = sliderstep26;
+let tmp29: Int = trunc(s_bufena+(27));
+ram[tmp29] = sliderstep27;
+let tmp30: Int = trunc(s_bufena+(28));
+ram[tmp30] = sliderstep28;
+let tmp31: Int = trunc(s_bufena+(29));
+ram[tmp31] = sliderstep29;
+let tmp32: Int = trunc(s_bufena+(30));
+ram[tmp32] = sliderstep30;
+let tmp33: Int = trunc(s_bufena+(31));
+ram[tmp33] = sliderstep31;
+let tmp34: Int = trunc(s_bufena+(32));
+ram[tmp34] = sliderstep32;
+let tmp35: Int = trunc(s_bufena+(33));
+ram[tmp35] = sliderstep33;
+let tmp36: Int = trunc(s_bufena+(34));
+ram[tmp36] = sliderstep34;
+let tmp37: Int = trunc(s_bufena+(35));
+ram[tmp37] = sliderstep35;
+let tmp38: Int = trunc(s_bufena+(36));
+ram[tmp38] = sliderstep36;
+let tmp39: Int = trunc(s_bufena+(37));
+ram[tmp39] = sliderstep37;
+let tmp40: Int = trunc(s_bufena+(38));
+ram[tmp40] = sliderstep38;
+let tmp41: Int = trunc(s_bufena+(39));
+ram[tmp41] = sliderstep39;
+let tmp42: Int = trunc(s_bufena+(40));
+ram[tmp42] = sliderstep40;
+let tmp43: Int = trunc(s_bufena+(41));
+ram[tmp43] = sliderstep41;
+let tmp44: Int = trunc(s_bufena+(42));
+ram[tmp44] = sliderstep42;
+let tmp45: Int = trunc(s_bufena+(43));
+ram[tmp45] = sliderstep43;
+let tmp46: Int = trunc(s_bufena+(44));
+ram[tmp46] = sliderstep44;
+let tmp47: Int = trunc(s_bufena+(45));
+ram[tmp47] = sliderstep45;
+let tmp48: Int = trunc(s_bufena+(46));
+ram[tmp48] = sliderstep46;
+let tmp49: Int = trunc(s_bufena+(47));
+ram[tmp49] = sliderstep47;
+let tmp50: Int = trunc(s_bufena+(48));
+ram[tmp50] = sliderstep48;
+let tmp51: Int = trunc(s_bufena+(49));
+ram[tmp51] = sliderstep49;
+let tmp52: Int = trunc(s_bufena+(50));
+ram[tmp52] = sliderstep50;
+let tmp53: Int = trunc(s_bufena+(51));
+ram[tmp53] = sliderstep51;
+let tmp54: Int = trunc(s_bufena+(52));
+ram[tmp54] = sliderstep52;
+let tmp55: Int = trunc(s_bufena+(53));
+ram[tmp55] = sliderstep53;
+let tmp56: Int = trunc(s_bufena+(54));
+ram[tmp56] = sliderstep54;
+let tmp57: Int = trunc(s_bufena+(55));
+ram[tmp57] = sliderstep55;
+let tmp58: Int = trunc(s_bufena+(56));
+ram[tmp58] = sliderstep56;
+ram[tmp58];
+controlsReady = 1;
+}
+
+}
+s_spl0 = in1;
+s_spl1 = in2;
+s_s = 1;
+s_off = ((0 - s_offs) - ((1 - pow(eelDivide(s_steep,15),.5)) * .4));
+for (let tmp59: Int = 0; tmp59 < 56; tmp59++) {
+let tmp60: Int = trunc(s_bufena+(s_s));
+let tmp69 = 0;
+if (ram[tmp60]) {
+let tmp61 = s_freq1;
+let tmp62 = s_off;
+let tmp68 = fn__curve(tmp62);
+s_freq1 = maximum(tmp61, tmp68);
+tmp69 = s_freq1;
+} else {
+tmp69 = 0;
+}
+s_s += 1;
+let tmp70 = 0;
+if (s_s <= 32) {
+s_off -= eelDivide(4,32);
+tmp70 = s_off;
+} else {
+s_off -= eelDivide(4,24);
+tmp70 = s_off;
+}
+
+}
+
+fn__upeq();
+s_freq1 = 0;
+let tmp121 = s_spl0;
+s_spl0 = fn_lp_L_eq(tmp121);
+let tmp133 = s_spl1;
+s_spl1 = fn_lp_R_eq(tmp133);
+
+out1 = s_spl0;
+out2 = s_spl1;
+frame++;
+if (frame >= vectorsize()) frame = 0;

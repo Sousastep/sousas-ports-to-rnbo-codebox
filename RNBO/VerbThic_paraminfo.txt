@@ -1,0 +1,40 @@
+VerbThic — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/verbthic/
+
+What it is: the sibling of VerbTiny: the same 5 controls, but the opposite
+character. Where VerbTiny is thin, airy and "tssshhh" (spaciousness),
+VerbThic's specially evolved matrix is dense, thick and soupy, for adding
+body and weight to sounds rather than depth of space. Use it to make pads,
+snares or vocals fat without buying tubes. This RNBO port uses the original
+normalized 0..1 values.
+
+Parameters (identical layout to VerbTiny, different delay network):
+
+- p_replace (Replace) 0..1, default 0.5
+  Regeneration ("Galactic-style replace" in the feedback path). This matrix
+  rings denser than VerbTiny: the same values read as "heavier" and stay
+  dense further up the knob. Push high for thick endless washes, watch
+  saturation at the top end.
+
+- p_derez (Derez) 0..1, default 1.0
+  Bezier undersampling / darkening of the wet. Higher = cleaner; lower =
+  progressively duller and more "lo-fi early reverb" character.
+
+- p_filter (Filter) 0..1, default 1.0
+  Wet tone via Bezier filter. 1.0 = brightest; lower = rounder, duller,
+  like a blanket over the plate. In VerbThic it also sort of thickens when
+  darkened (dark low end stays big).
+
+- p_wider (Wider) 0..1, default 0.0
+  Same tri-mode wideness as VerbTiny: normal stereo near 0, weird dual-mono
+  blending near 0.5, hyper-wide opposite-phase near 1.0. On such a dense
+  matrix the differences are subtler - it reads more like "thickness
+  location" than space effect.
+
+- p_drywet (Dry/Wet) 0..1, default 1.0
+  Normal linear dry/wet blend (1.0 = full wet return).
+
+Musical notes: the counterpart room-mate of VerbTiny. Use VerbThic on
+things that need mass (cymbals, pads, snares) and VerbTiny for air on a
+small budget. As always on Airwindows verbs, full tails develop over 2-3
+seconds - trust your ears after a while, not the first 500 ms.

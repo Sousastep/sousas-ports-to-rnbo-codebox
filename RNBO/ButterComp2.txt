@@ -1,0 +1,276 @@
+/* ButterComp2 — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Compress
+@param({ min: 0, max: 1 }) p_compress = 0.0;
+// VST B: Output
+@param({ min: 0, max: 1 }) p_output = 0.5;
+// VST C: Dry/Wet
+@param({ min: 0, max: 1 }) p_drywet = 1.0;
+
+@state controlAposL = 0;
+@state controlAnegL = 0;
+@state controlBposL = 0;
+@state controlBnegL = 0;
+@state targetposL = 0;
+@state targetnegL = 0;
+@state lastOutputL = 0;
+@state controlAposR = 0;
+@state controlAnegR = 0;
+@state controlBposR = 0;
+@state controlBnegR = 0;
+@state targetposR = 0;
+@state targetnegR = 0;
+@state lastOutputR = 0;
+@state flip = 0;
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state inputgain = 0;
+@state compfactor = 0;
+@state output = 0;
+@state wet = 0;
+@state outputgain = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+function init() {
+
+	controlAposL = 1.0;
+	controlAnegL = 1.0;
+	controlBposL = 1.0;
+	controlBnegL = 1.0;
+	targetposL = 1.0;
+	targetnegL = 1.0;
+	lastOutputL = 0.0;
+
+	controlAposR = 1.0;
+	controlAnegR = 1.0;
+	controlBposR = 1.0;
+	controlBnegR = 1.0;
+	targetposR = 1.0;
+	targetnegR = 1.0;
+	lastOutputR = 0.0;
+
+	flip = 0;
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 1.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();
+	
+	inputgain = pow(10.0,(p_compress*14.0)/20.0);
+	compfactor = 0.012 * (p_compress / 135.0);
+	output = p_output * 2.0;
+	wet = p_drywet;
+	
+	outputgain = inputgain;
+	outputgain -= 1.0;
+	outputgain /= 1.5;
+	outputgain += 1.0;
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+
+		// Legacy ~1e-16 residue noise omitted; compression is unchanged.
+let drySampleL = inputSampleL;
+		let drySampleR = inputSampleR;
+		
+		inputSampleL *= inputgain;
+		inputSampleR *= inputgain;
+		
+		let divisor = compfactor / (1.0+abs(lastOutputL));
+		
+		divisor /= overallscale;
+		let remainder = divisor;
+		divisor = 1.0 - divisor;
+
+		let inputposL = inputSampleL + 1.0;
+		if (inputposL < 0.0) inputposL = 0.0;
+		let outputposL = inputposL / 2.0;
+		if (outputposL > 1.0) outputposL = 1.0;		
+		inputposL *= inputposL;
+		targetposL *= divisor;
+		targetposL += (inputposL * remainder);
+		let calcposL = pow((1.0/targetposL),2);
+		
+		let inputnegL = (-inputSampleL) + 1.0;
+		if (inputnegL < 0.0) inputnegL = 0.0;
+		let outputnegL = inputnegL / 2.0;
+		if (outputnegL > 1.0) outputnegL = 1.0;		
+		inputnegL *= inputnegL;
+		targetnegL *= divisor;
+		targetnegL += (inputnegL * remainder);
+		let calcnegL = pow((1.0/targetnegL),2);
+
+		if (inputSampleL > 0)
+		{ 
+			if (flip)
+			{
+				controlAposL *= divisor;
+				controlAposL += (calcposL*remainder);
+				
+			}
+			else
+			{
+				controlBposL *= divisor;
+				controlBposL += (calcposL*remainder);
+			}
+		}
+		else
+		{ 
+			if (flip)
+			{
+				controlAnegL *= divisor;
+				controlAnegL += (calcnegL*remainder);
+			}
+			else
+			{
+				controlBnegL *= divisor;
+				controlBnegL += (calcnegL*remainder);
+			}
+		}
+
+		divisor = compfactor / (1.0+abs(lastOutputR));
+		
+		divisor /= overallscale;
+		remainder = divisor;
+		divisor = 1.0 - divisor;
+
+		let inputposR = inputSampleR + 1.0;
+		if (inputposR < 0.0) inputposR = 0.0;
+		let outputposR = inputposR / 2.0;
+		if (outputposR > 1.0) outputposR = 1.0;		
+		inputposR *= inputposR;
+		targetposR *= divisor;
+		targetposR += (inputposR * remainder);
+		let calcposR = pow((1.0/targetposR),2);
+		
+		let inputnegR = (-inputSampleR) + 1.0;
+		if (inputnegR < 0.0) inputnegR = 0.0;
+		let outputnegR = inputnegR / 2.0;
+		if (outputnegR > 1.0) outputnegR = 1.0;		
+		inputnegR *= inputnegR;
+		targetnegR *= divisor;
+		targetnegR += (inputnegR * remainder);
+		let calcnegR = pow((1.0/targetnegR),2);
+
+		if (inputSampleR > 0)
+		{ 
+			if (flip)
+			{
+				controlAposR *= divisor;
+				controlAposR += (calcposR*remainder);
+				
+			}
+			else
+			{
+				controlBposR *= divisor;
+				controlBposR += (calcposR*remainder);
+			}
+		}
+		else
+		{ 
+			if (flip)
+			{
+				controlAnegR *= divisor;
+				controlAnegR += (calcnegR*remainder);
+			}
+			else
+			{
+				controlBnegR *= divisor;
+				controlBnegR += (calcnegR*remainder);
+			}
+		}
+
+		let totalmultiplierL;
+		let totalmultiplierR;
+		if (flip)
+		{
+			totalmultiplierL = (controlAposL * outputposL) + (controlAnegL * outputnegL);
+			totalmultiplierR = (controlAposR * outputposR) + (controlAnegR * outputnegR);
+		}
+		else
+		{
+			totalmultiplierL = (controlBposL * outputposL) + (controlBnegL * outputnegL);
+			totalmultiplierR = (controlBposR * outputposR) + (controlBnegR * outputnegR);
+		}
+
+		inputSampleL *= totalmultiplierL;
+		inputSampleL /= outputgain;
+		
+		inputSampleR *= totalmultiplierR;
+		inputSampleR /= outputgain;
+		
+		if (output != 1.0) {
+			inputSampleL *= output;
+			inputSampleR *= output;
+		}
+		
+		if (wet !=1.0) {
+			inputSampleL = (inputSampleL * wet) + (drySampleL * (1.0-wet));
+			inputSampleR = (inputSampleR * wet) + (drySampleR * (1.0-wet));
+		}
+		
+		lastOutputL = inputSampleL;
+		lastOutputR = inputSampleR;
+
+		flip = !flip;
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

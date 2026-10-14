@@ -1,0 +1,54 @@
+Ultralight2 — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/ultralight2/
+
+What it is: the most low-CPU Airwindows reverb possible: a 4x4 Householder
+matrix plus tone shaping and a small allpass chain running beside the
+pre-delay. It is made for dozens of mono instances in a game-like mix; on
+stereo it is a very honest "plain decent room". This RNBO port keeps float32
+delay storage like the source, uses 10 sequential steps for some controls
+(see below), and uses multiply-add instead of a fused FMA (numerical note).
+
+Parameters:
+
+- p_damping (Damping) 0..1, default 0.65 (10 discrete steps)
+  Internally index = floor(p*9.99), so the slider snaps to 10 levels.
+  damping = 0.0625 - (index * 0.003125), and index 0 = verb BYPASS
+  (the network is skipped entirely, you hear dry). Level 1 = most HF
+  damping going into the matrix (dark, close, cozy); level 9 (max) is
+  the brightest and most ringy.
+
+- p_unsolid (UnSolid) 0..1, default 0.75 (5 discrete steps)
+  Internal "unsolid" control: parametrizes 4 - floor(p*4.99). It reduces
+  the "solid walls" feeling by inserting slight modal variation in the
+  matrix lines. Low p values = more solid/metallic comb; high p values =
+  a more diffuse, wooden-sounding space. In-between values are steppy on
+  purpose - audition the 5 stops.
+
+- p_unreflc (UnReflc) 0..1, default 0.75 (5 discrete steps)
+  Internal "unreflect": reduces discrete early reflection / metallic echo
+  density the same 5-way way. 0 = very defined reflections, 1.0 = a
+  smooth, flat room blur.
+
+- p_predlay (Predlay) 0..1, default 0.54
+  Pre-delay to prime-indexed delay lines. 0 (roughly below 0.01) bypasses
+  the pre-delay chain; otherwise the index (about 1..998) selects four
+  prime-numbered delays, roughly up to ~20 ms at 44.1 kHz (with
+  additional sqrt-nested prime partners). Musically: small values on
+  drums keep transients intact, bigger values push the vocal back in
+  the space.
+
+- p_distnce (Distnce) 0..1, default 0.0
+  Extra perceived distance for the wet path, from the FastDistance idea:
+  internally distance = pow(p*7.28, 2) (about 0..53 steps), a quadratic
+  taper. Unlike a simple volume, it adds an interpolating depth-wobble
+  that lets you sit a source "deeper" in the room. Default 0 = off.
+
+- p_drywet (Dry/Wet) 0..1, default 0.5
+  Straight linear dry/wet blend.
+
+Musical notes: exactly what the name says: cheap, clean, a bit sterile.
+Use as the default " glue-less room" on a mono source, or layer multiple
+programs for a bigger virtual hallscape (the reason it was written).
+The 10-step Damping always picks a discrete value - use 0.65/0.75 as
+starting points and trust the discrete stops rather than continuous
+listening.

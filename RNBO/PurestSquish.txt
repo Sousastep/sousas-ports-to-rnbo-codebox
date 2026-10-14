@@ -1,0 +1,599 @@
+/* PurestSquish — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Squish
+@param({ min: 0, max: 1 }) p_squish = 0.0;
+// VST B: BassBlm
+@param({ min: 0, max: 1 }) p_bassblm = 0.0;
+// VST C: Output
+@param({ min: 0, max: 1 }) p_output = 1.0;
+// VST D: Dry/Wet
+@param({ min: 0, max: 1 }) p_drywet = 1.0;
+
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state muVaryL = 0;
+@state muAttackL = 0;
+@state muNewSpeedL = 0;
+@state muSpeedAL = 0;
+@state muSpeedBL = 0;
+@state muSpeedCL = 0;
+@state muSpeedDL = 0;
+@state muSpeedEL = 0;
+@state muCoefficientAL = 0;
+@state muCoefficientBL = 0;
+@state muCoefficientCL = 0;
+@state muCoefficientDL = 0;
+@state muCoefficientEL = 0;
+@state iirSampleAL = 0;
+@state iirSampleBL = 0;
+@state iirSampleCL = 0;
+@state iirSampleDL = 0;
+@state iirSampleEL = 0;
+@state lastCoefficientAL = 0;
+@state lastCoefficientBL = 0;
+@state lastCoefficientCL = 0;
+@state lastCoefficientDL = 0;
+@state mergedCoefficientsL = 0;
+@state muVaryR = 0;
+@state muAttackR = 0;
+@state muNewSpeedR = 0;
+@state muSpeedAR = 0;
+@state muSpeedBR = 0;
+@state muSpeedCR = 0;
+@state muSpeedDR = 0;
+@state muSpeedER = 0;
+@state muCoefficientAR = 0;
+@state muCoefficientBR = 0;
+@state muCoefficientCR = 0;
+@state muCoefficientDR = 0;
+@state muCoefficientER = 0;
+@state iirSampleAR = 0;
+@state iirSampleBR = 0;
+@state iirSampleCR = 0;
+@state iirSampleDR = 0;
+@state iirSampleER = 0;
+@state lastCoefficientAR = 0;
+@state lastCoefficientBR = 0;
+@state lastCoefficientCR = 0;
+@state lastCoefficientDR = 0;
+@state mergedCoefficientsR = 0;
+@state count: Int = 0;
+@state fpFlip = 0;
+@state overallscale = 0;
+@state threshold = 0;
+@state iirAmount = 0;
+@state output = 0;
+@state wet = 0;
+@state highpassSampleL = 0;
+@state highpassSampleBL = 0;
+@state highpassSampleR = 0;
+@state highpassSampleBR = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+function init() {
+
+	muSpeedAL = 10000;
+	muSpeedBL = 10000;
+	muSpeedCL = 10000;
+	muSpeedDL = 10000;
+	muSpeedEL = 10000;
+	muCoefficientAL = 1;
+	muCoefficientBL = 1;
+	muCoefficientCL = 1;
+	muCoefficientDL = 1;
+	muCoefficientEL = 1;
+	iirSampleAL = 0.0;
+	iirSampleBL = 0.0;
+	iirSampleCL = 0.0;
+	iirSampleDL = 0.0;
+	iirSampleEL = 0.0;
+	lastCoefficientAL = 1;
+	lastCoefficientBL = 1;
+	lastCoefficientCL = 1;
+	lastCoefficientDL = 1;
+	mergedCoefficientsL = 1;
+	muVaryL = 1;
+
+	muSpeedAR = 10000;
+	muSpeedBR = 10000;
+	muSpeedCR = 10000;
+	muSpeedDR = 10000;
+	muSpeedER = 10000;
+	muCoefficientAR = 1;
+	muCoefficientBR = 1;
+	muCoefficientCR = 1;
+	muCoefficientDR = 1;
+	muCoefficientER = 1;
+	iirSampleAR = 0.0;
+	iirSampleBR = 0.0;
+	iirSampleCR = 0.0;
+	iirSampleDR = 0.0;
+	iirSampleER = 0.0;
+	lastCoefficientAR = 1;
+	lastCoefficientBR = 1;
+	lastCoefficientCR = 1;
+	lastCoefficientDR = 1;
+	mergedCoefficientsR = 1;
+	muVaryR = 1;
+	
+	count = 1;
+	fpFlip = 1;
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 1.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();
+
+	threshold = 1.01 - (1.0-pow(1.0-(p_squish*0.5),4));
+	iirAmount = pow(p_bassblm,4)/overallscale;
+	output = p_output;
+	wet = p_drywet;
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+
+		if (abs(inputSampleL)<1.18e-23) inputSampleL = fpdL * 1.18e-17;
+		if (abs(inputSampleR)<1.18e-23) inputSampleR = fpdR * 1.18e-17;
+		let drySampleL = inputSampleL;
+		let drySampleR = inputSampleR;
+		
+		let muMakeupGainL = 1.0 / threshold;
+		let outMakeupGainL = sqrt(muMakeupGainL);
+		muMakeupGainL += outMakeupGainL;
+		muMakeupGainL *= 0.5;
+		outMakeupGainL *= 0.5;
+		
+		let releaseL = mergedCoefficientsL * 32768.0;
+		releaseL /= overallscale;
+		let fastestL = sqrt(releaseL);
+		
+		let lastCorrectionL = mergedCoefficientsL;
+
+		let muMakeupGainR = 1.0 / threshold;
+		let outMakeupGainR = sqrt(muMakeupGainR);
+		muMakeupGainR += outMakeupGainR;
+		muMakeupGainR *= 0.5;
+		outMakeupGainR *= 0.5;
+		
+		let releaseR = mergedCoefficientsR * 32768.0;
+		releaseR /= overallscale;
+		let fastestR = sqrt(releaseR);
+		
+		let lastCorrectionR = mergedCoefficientsR;
+
+		if (muMakeupGainL != 1.0) inputSampleL = inputSampleL * muMakeupGainL;
+		if (muMakeupGainR != 1.0) inputSampleR = inputSampleR * muMakeupGainR;
+		
+		highpassSampleBL = highpassSampleL = inputSampleL;
+		highpassSampleBR = highpassSampleR = inputSampleR;
+		
+		if (count < 1 || count > 3) count = 1;
+		switch (count)
+		{
+			case 1:
+				
+				iirSampleAL = (iirSampleAL * (1 - iirAmount)) + (highpassSampleL * iirAmount);
+				highpassSampleL -= iirSampleAL;
+				if (abs(highpassSampleL) > threshold)
+				{
+					muVaryL = threshold / abs(highpassSampleL);
+					muAttackL = sqrt(abs(muSpeedAL));
+					muCoefficientAL = muCoefficientAL * (muAttackL-1.0);
+					if (muVaryL < threshold)
+					{
+						muCoefficientAL = muCoefficientAL + threshold;
+					}
+					else
+					{
+						muCoefficientAL = muCoefficientAL + muVaryL;
+					}
+					muCoefficientAL = muCoefficientAL / muAttackL;
+				}
+				else
+				{
+					muCoefficientAL = muCoefficientAL * ((muSpeedAL * muSpeedAL)-1.0);
+					muCoefficientAL = muCoefficientAL + 1.0;
+					muCoefficientAL = muCoefficientAL / (muSpeedAL * muSpeedAL);
+				}
+				muNewSpeedL = muSpeedAL * (muSpeedAL-1);
+				muNewSpeedL = muNewSpeedL + abs(highpassSampleL*releaseL)+fastestL;
+				muSpeedAL = muNewSpeedL / muSpeedAL;
+				lastCoefficientAL = pow(muCoefficientAL,2);
+				mergedCoefficientsL = lastCoefficientBL;
+				mergedCoefficientsL += lastCoefficientAL;
+				lastCoefficientAL *= (1.0-lastCorrectionL);
+				lastCoefficientAL += (muCoefficientAL * lastCorrectionL);
+				lastCoefficientBL = lastCoefficientAL;
+
+				iirSampleAR = (iirSampleAR * (1 - iirAmount)) + (highpassSampleR * iirAmount);
+				highpassSampleR -= iirSampleAR;
+				if (abs(highpassSampleR) > threshold)
+				{
+					muVaryR = threshold / abs(highpassSampleR);
+					muAttackR = sqrt(abs(muSpeedAR));
+					muCoefficientAR = muCoefficientAR * (muAttackR-1.0);
+					if (muVaryR < threshold)
+					{
+						muCoefficientAR = muCoefficientAR + threshold;
+					}
+					else
+					{
+						muCoefficientAR = muCoefficientAR + muVaryR;
+					}
+					muCoefficientAR = muCoefficientAR / muAttackR;
+				}
+				else
+				{
+					muCoefficientAR = muCoefficientAR * ((muSpeedAR * muSpeedAR)-1.0);
+					muCoefficientAR = muCoefficientAR + 1.0;
+					muCoefficientAR = muCoefficientAR / (muSpeedAR * muSpeedAR);
+				}
+				muNewSpeedR = muSpeedAR * (muSpeedAR-1);
+				muNewSpeedR = muNewSpeedR + abs(highpassSampleR*releaseR)+fastestR;
+				muSpeedAR = muNewSpeedR / muSpeedAR;
+				lastCoefficientAR = pow(muCoefficientAR,2);
+				mergedCoefficientsR = lastCoefficientBR;
+				mergedCoefficientsR += lastCoefficientAR;
+				lastCoefficientAR *= (1.0-lastCorrectionR);
+				lastCoefficientAR += (muCoefficientAR * lastCorrectionR);
+				lastCoefficientBR = lastCoefficientAR;
+
+				break;
+			case 2:
+				
+				iirSampleBL = (iirSampleBL * (1 - iirAmount)) + (highpassSampleL * iirAmount);
+				highpassSampleL -= iirSampleBL;
+				if (abs(highpassSampleL) > threshold)
+				{
+					muVaryL = threshold / abs(highpassSampleL);
+					muAttackL = sqrt(abs(muSpeedBL));
+					muCoefficientBL = muCoefficientBL * (muAttackL-1);
+					if (muVaryL < threshold)
+					{
+						muCoefficientBL = muCoefficientBL + threshold;
+					}
+					else
+					{
+						muCoefficientBL = muCoefficientBL + muVaryL;
+					}
+					muCoefficientBL = muCoefficientBL / muAttackL;
+				}
+				else
+				{
+					muCoefficientBL = muCoefficientBL * ((muSpeedBL * muSpeedBL)-1.0);
+					muCoefficientBL = muCoefficientBL + 1.0;
+					muCoefficientBL = muCoefficientBL / (muSpeedBL * muSpeedBL);
+				}
+				muNewSpeedL = muSpeedBL * (muSpeedBL-1);
+				muNewSpeedL = muNewSpeedL + abs(highpassSampleL*releaseL)+fastestL;
+				muSpeedBL = muNewSpeedL / muSpeedBL;
+				lastCoefficientAL = pow(muCoefficientBL,2);
+				mergedCoefficientsL = lastCoefficientBL;
+				mergedCoefficientsL += lastCoefficientAL;
+				lastCoefficientAL *= (1.0-lastCorrectionL);
+				lastCoefficientAL += (muCoefficientBL * lastCorrectionL);
+				lastCoefficientBL = lastCoefficientAL;
+
+				iirSampleBR = (iirSampleBR * (1 - iirAmount)) + (highpassSampleR * iirAmount);
+				highpassSampleR -= iirSampleBR;
+				if (abs(highpassSampleR) > threshold)
+				{
+					muVaryR = threshold / abs(highpassSampleR);
+					muAttackR = sqrt(abs(muSpeedBR));
+					muCoefficientBR = muCoefficientBR * (muAttackR-1);
+					if (muVaryR < threshold)
+					{
+						muCoefficientBR = muCoefficientBR + threshold;
+					}
+					else
+					{
+						muCoefficientBR = muCoefficientBR + muVaryR;
+					}
+					muCoefficientBR = muCoefficientBR / muAttackR;
+				}
+				else
+				{
+					muCoefficientBR = muCoefficientBR * ((muSpeedBR * muSpeedBR)-1.0);
+					muCoefficientBR = muCoefficientBR + 1.0;
+					muCoefficientBR = muCoefficientBR / (muSpeedBR * muSpeedBR);
+				}
+				muNewSpeedR = muSpeedBR * (muSpeedBR-1);
+				muNewSpeedR = muNewSpeedR + abs(highpassSampleR*releaseR)+fastestR;
+				muSpeedBR = muNewSpeedR / muSpeedBR;
+				lastCoefficientAR = pow(muCoefficientBR,2);
+				mergedCoefficientsR = lastCoefficientBR;
+				mergedCoefficientsR += lastCoefficientAR;
+				lastCoefficientAR *= (1.0-lastCorrectionR);
+				lastCoefficientAR += (muCoefficientBR * lastCorrectionR);
+				lastCoefficientBR = lastCoefficientAR;
+
+				break;
+			case 3:
+				
+				iirSampleCL = (iirSampleCL * (1 - iirAmount)) + (highpassSampleL * iirAmount);
+				highpassSampleL -= iirSampleCL;
+				if (abs(highpassSampleL) > threshold)
+				{
+					muVaryL = threshold / abs(highpassSampleL);
+					muAttackL = sqrt(abs(muSpeedCL));
+					muCoefficientCL = muCoefficientCL * (muAttackL-1);
+					if (muVaryL < threshold)
+					{
+						muCoefficientCL = muCoefficientCL + threshold;
+					}
+					else
+					{
+						muCoefficientCL = muCoefficientCL + muVaryL;
+					}
+					muCoefficientCL = muCoefficientCL / muAttackL;
+				}
+				else
+				{
+					muCoefficientCL = muCoefficientCL * ((muSpeedCL * muSpeedCL)-1.0);
+					muCoefficientCL = muCoefficientCL + 1.0;
+					muCoefficientCL = muCoefficientCL / (muSpeedCL * muSpeedCL);
+				}
+				muNewSpeedL = muSpeedCL * (muSpeedCL-1);
+				muNewSpeedL = muNewSpeedL + abs(highpassSampleL*releaseL)+fastestL;
+				muSpeedCL = muNewSpeedL / muSpeedCL;
+				lastCoefficientAL = pow(muCoefficientCL,2);
+				mergedCoefficientsL = lastCoefficientBL;
+				mergedCoefficientsL += lastCoefficientAL;
+				lastCoefficientAL *= (1.0-lastCorrectionL);
+				lastCoefficientAL += (muCoefficientCL * lastCorrectionL);
+				lastCoefficientBL = lastCoefficientAL;
+
+				iirSampleCR = (iirSampleCR * (1 - iirAmount)) + (highpassSampleR * iirAmount);
+				highpassSampleR -= iirSampleCR;
+				if (abs(highpassSampleR) > threshold)
+				{
+					muVaryR = threshold / abs(highpassSampleR);
+					muAttackR = sqrt(abs(muSpeedCR));
+					muCoefficientCR = muCoefficientCR * (muAttackR-1);
+					if (muVaryR < threshold)
+					{
+						muCoefficientCR = muCoefficientCR + threshold;
+					}
+					else
+					{
+						muCoefficientCR = muCoefficientCR + muVaryR;
+					}
+					muCoefficientCR = muCoefficientCR / muAttackR;
+				}
+				else
+				{
+					muCoefficientCR = muCoefficientCR * ((muSpeedCR * muSpeedCR)-1.0);
+					muCoefficientCR = muCoefficientCR + 1.0;
+					muCoefficientCR = muCoefficientCR / (muSpeedCR * muSpeedCR);
+				}
+				muNewSpeedR = muSpeedCR * (muSpeedCR-1);
+				muNewSpeedR = muNewSpeedR + abs(highpassSampleR*releaseR)+fastestR;
+				muSpeedCR = muNewSpeedR / muSpeedCR;
+				lastCoefficientAR = pow(muCoefficientCR,2);
+				mergedCoefficientsR = lastCoefficientBR;
+				mergedCoefficientsR += lastCoefficientAR;
+				lastCoefficientAR *= (1.0-lastCorrectionR);
+				lastCoefficientAR += (muCoefficientCR * lastCorrectionR);
+				lastCoefficientBR = lastCoefficientAR;
+
+				break;
+		}		
+		count++;
+
+		if (fpFlip) {
+			
+			iirSampleDL = (iirSampleDL * (1 - iirAmount)) + (highpassSampleBL * iirAmount);
+			highpassSampleBL -= iirSampleDL;
+			if (abs(highpassSampleBL) > threshold)
+			{
+				muVaryL = threshold / abs(highpassSampleBL);
+				muAttackL = sqrt(abs(muSpeedDL));
+				muCoefficientDL = muCoefficientDL * (muAttackL-1.0);
+				if (muVaryL < threshold)
+				{
+					muCoefficientDL = muCoefficientDL + threshold;
+				}
+				else
+				{
+					muCoefficientDL = muCoefficientDL + muVaryL;
+				}
+				muCoefficientDL = muCoefficientDL / muAttackL;
+			}
+			else
+			{
+				muCoefficientDL = muCoefficientDL * ((muSpeedDL * muSpeedDL)-1.0);
+				muCoefficientDL = muCoefficientDL + 1.0;
+				muCoefficientDL = muCoefficientDL / (muSpeedDL * muSpeedDL);
+			}
+			muNewSpeedL = muSpeedDL * (muSpeedDL-1);
+			muNewSpeedL = muNewSpeedL + abs(highpassSampleBL*releaseL)+fastestL;
+			muSpeedDL = muNewSpeedL / muSpeedDL;
+			lastCoefficientCL = pow(muCoefficientEL,2);
+			mergedCoefficientsL += lastCoefficientDL;
+			mergedCoefficientsL += lastCoefficientCL;
+			lastCoefficientCL *= (1.0-lastCorrectionL);
+			lastCoefficientCL += (muCoefficientDL * lastCorrectionL);
+			lastCoefficientDL = lastCoefficientCL;
+
+			iirSampleDR = (iirSampleDR * (1 - iirAmount)) + (highpassSampleBR * iirAmount);
+			highpassSampleBR -= iirSampleDR;
+			if (abs(highpassSampleBR) > threshold)
+			{
+				muVaryR = threshold / abs(highpassSampleBR);
+				muAttackR = sqrt(abs(muSpeedDR));
+				muCoefficientDR = muCoefficientDR * (muAttackR-1.0);
+				if (muVaryR < threshold)
+				{
+					muCoefficientDR = muCoefficientDR + threshold;
+				}
+				else
+				{
+					muCoefficientDR = muCoefficientDR + muVaryR;
+				}
+				muCoefficientDR = muCoefficientDR / muAttackR;
+			}
+			else
+			{
+				muCoefficientDR = muCoefficientDR * ((muSpeedDR * muSpeedDR)-1.0);
+				muCoefficientDR = muCoefficientDR + 1.0;
+				muCoefficientDR = muCoefficientDR / (muSpeedDR * muSpeedDR);
+			}
+			muNewSpeedR = muSpeedDR * (muSpeedDR-1);
+			muNewSpeedR = muNewSpeedR + abs(highpassSampleBR*releaseR)+fastestR;
+			muSpeedDR = muNewSpeedR / muSpeedDR;
+			lastCoefficientCR = pow(muCoefficientER,2);
+			mergedCoefficientsR += lastCoefficientDR;
+			mergedCoefficientsR += lastCoefficientCR;
+			lastCoefficientCR *= (1.0-lastCorrectionR);
+			lastCoefficientCR += (muCoefficientDR * lastCorrectionR);
+			lastCoefficientDR = lastCoefficientCR;
+
+		} else {
+			
+			iirSampleEL = (iirSampleEL * (1 - iirAmount)) + (highpassSampleBL * iirAmount);
+			highpassSampleBL -= iirSampleEL;
+			if (abs(highpassSampleBL) > threshold)
+			{
+				muVaryL = threshold / abs(highpassSampleBL);
+				muAttackL = sqrt(abs(muSpeedEL));
+				muCoefficientEL = muCoefficientEL * (muAttackL-1.0);
+				if (muVaryL < threshold)
+				{
+					muCoefficientEL = muCoefficientEL + threshold;
+				}
+				else
+				{
+					muCoefficientEL = muCoefficientEL + muVaryL;
+				}
+				muCoefficientEL = muCoefficientEL / muAttackL;
+			}
+			else
+			{
+				muCoefficientEL = muCoefficientEL * ((muSpeedEL * muSpeedEL)-1.0);
+				muCoefficientEL = muCoefficientEL + 1.0;
+				muCoefficientEL = muCoefficientEL / (muSpeedEL * muSpeedEL);
+			}
+			muNewSpeedL = muSpeedEL * (muSpeedEL-1);
+			muNewSpeedL = muNewSpeedL + abs(highpassSampleBL*releaseL)+fastestL;
+			muSpeedEL = muNewSpeedL / muSpeedEL;
+			lastCoefficientCL = pow(muCoefficientEL,2);
+			mergedCoefficientsL += lastCoefficientDL;
+			mergedCoefficientsL += lastCoefficientCL;
+			lastCoefficientCL *= (1.0-lastCorrectionL);
+			lastCoefficientCL += (muCoefficientEL * lastCorrectionL);
+			lastCoefficientDL = lastCoefficientCL;
+
+			iirSampleER = (iirSampleER * (1 - iirAmount)) + (highpassSampleBR * iirAmount);
+			highpassSampleBR -= iirSampleER;
+			if (abs(highpassSampleBR) > threshold)
+			{
+				muVaryR = threshold / abs(highpassSampleBR);
+				muAttackR = sqrt(abs(muSpeedER));
+				muCoefficientER = muCoefficientER * (muAttackR-1.0);
+				if (muVaryR < threshold)
+				{
+					muCoefficientER = muCoefficientER + threshold;
+				}
+				else
+				{
+					muCoefficientER = muCoefficientER + muVaryR;
+				}
+				muCoefficientER = muCoefficientER / muAttackR;
+			}
+			else
+			{
+				muCoefficientER = muCoefficientER * ((muSpeedER * muSpeedER)-1.0);
+				muCoefficientER = muCoefficientER + 1.0;
+				muCoefficientER = muCoefficientER / (muSpeedER * muSpeedER);
+			}
+			muNewSpeedR = muSpeedER * (muSpeedER-1);
+			muNewSpeedR = muNewSpeedR + abs(highpassSampleBR*releaseR)+fastestR;
+			muSpeedER = muNewSpeedR / muSpeedER;
+			lastCoefficientCR = pow(muCoefficientER,2);
+			mergedCoefficientsR += lastCoefficientDR;
+			mergedCoefficientsR += lastCoefficientCR;
+			lastCoefficientCR *= (1.0-lastCorrectionR);
+			lastCoefficientCR += (muCoefficientER * lastCorrectionR);
+			lastCoefficientDR = lastCoefficientCR;
+
+		}
+		mergedCoefficientsL *= 0.25;
+		inputSampleL *= mergedCoefficientsL;
+		
+		mergedCoefficientsR *= 0.25;
+		inputSampleR *= mergedCoefficientsR;
+		
+		if (outMakeupGainL != 1.0) inputSampleL = inputSampleL * outMakeupGainL;
+		if (outMakeupGainR != 1.0) inputSampleR = inputSampleR * outMakeupGainR;
+		
+		fpFlip = !fpFlip;
+		
+		if (output < 1.0) {
+			inputSampleL *= output;
+			inputSampleR *= output;
+		}
+		
+		if (wet < 1.0) {
+			inputSampleL = (inputSampleL * wet) + (drySampleL * (1.0-wet));
+			inputSampleR = (inputSampleR * wet) + (drySampleR * (1.0-wet));
+		}
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

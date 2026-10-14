@@ -1,0 +1,29 @@
+PaulWide — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/paulwide/
+
+What it is: not a conventional stereo widener. It is a dither/decimation
+style stereo decorrelator: it quantizes audio with randomly dithered, NOT
+correlated dither between channels, at an adjustable bit depth. The
+decorrelated dither acts as constant tiny uncorrelated signal, which the ear
+perceives as extra width and air (and a bit ofcontrolled "air"/level lift).
+This RNBO port uses the original normalized 0..1 values.
+
+Parameters:
+
+- p_quant (Quant) 0..1, default 1.0 (2 discrete modes)
+  Base processing depth, two discrete picks:
+  p_quant >= 0.5  24-bit processing (highres, internal scale 2^23)
+  p_quant <  0.5  16-bit processing (internal scale 2^15) - the original
+                  PaulWide behavior: noisier, wider character
+
+- p_derez (DeRez) 0..1, default 0.0
+  Progressive bit-depth reduction. Internally scale factor is multiplied by
+  pow(1-p, 6) (a steep curve: heavy settings already fall away quickly).
+  At low values it just adds the widening dither; as it nears ~0.4-0.6 it
+  sounds like lo-fi 8-4bit noise; near 1.0 it collapses nearly to noise
+  floor. Works on any program; use an ear.
+
+Musical notes: useful as a subtle air/width enhancer on the master buss (a
+little DeRez with Quant=24) or as a lo-fi crackle texture on a return. The
+"widening" is pure psychoacoustics from the dither, so high DeRez values
+should be saved for effect use.

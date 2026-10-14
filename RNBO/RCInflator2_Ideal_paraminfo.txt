@@ -1,0 +1,59 @@
+RCInflator2 (Ideal Edition) — RCJacH / sai'ke / chmaha (ReaTeam JSFX)
+Page: https://github.com/ReaTeam/JSFX/blob/master/Distortion/RCInflator2_Ideal.jsfx
+(REaPack distribution: ReaTeam JSFX -> Distortion, "RCInflator2 (Ideal
+Edition)". This is a free JSFX re-implementation of the classic Sonnox
+Oxford Inflator algorithm for REAPER, reworked here as an RNBO codebox.)
+
+What it is: an Inflator-style loudness enhancer: a curve-controlled
+waveshaper that lifts perceived loudness, warmth and density without
+crushing dynamics, with an optional band-split for bass-safe processing
+(nonlinear saturation is split off the low end) and optional ideality
+(no "positive clipping"). This RNBO port keeps the source's parameter
+values (slider units). Note: "Effect In" bypasses only the waveshaper -
+input/output gains and input clipping stay in the path (README note).
+
+Parameters (original names):
+
+- input_db (Input) (dB) -6..+12, default 0
+  Input level before the waveshaper. Higher = more material hits the
+  curve boost, i.e. hotter into saturation. Negative = push right
+  down to keep the curve gentle for busy masters.
+
+- effect  (Effect) 0..100, default 0
+  The main Inflator amount: 0 = (quiet) exact bypass of the curve,
+  50 = classic moderately strong densify, 100 = the characterful
+  "fully inflated" curve. Raising it is almost always audible
+  immediately: richer low-mids and a warm, "louder-feeling" mix.
+
+- curve  (Curve) -50..+50, default 0
+  Waveshaper curve shape. -50 = most linear/natural (flattest curve,
+  gentle stuff), +50 = most aggressive "compressed mid" bulge of the
+  gain curve. The peak of the curve is around 0, so breaking out of
+  "flat" quickly gets characterful; common pro settings keep curve
+  <= +25.
+
+- clip  (Off/On enum) default Off
+  Input clipping toggle: when enabled, the input stage can hit the
+  ceiling like a real converter - adds its tiny extra compression
+  on loud material. Leave off for pure Inflator curves.
+
+- band_split (Off/On enum) default Off
+  Turns on band splitting (the source stays with the original
+  240/2400 Hz crossover, README note) so bass notes bypass the
+  waveshaper, avoiding the famous Inflator "pumping bass" effect.
+  On = safer for bass-heavy masters, slightly less glued together.
+
+- effect_in (Off/On enum) default On
+  Engages the waveshaper block itself. When off only the waveshaper is
+  bypassed - gains and input clipping are still in the path (README
+  note), so use it as a "curve toggle" for direct comparison.
+
+- output_db (Output) (dB) -12..0, default 0
+  Output trim, only attenuator (no gain up) - the source's output is
+  attenuator-only by design, so use Input and Effect to build level.
+
+Musical notes: the classic mastering chain is Effect 30-50, Curve
+0..25, band_split on for bass-heavy programs, then output trim to
+match. Beware: the perceived "louder" is largely psychoacoustic -
+A/B with level matched, and you'll find that your old "hot" settings
+often just rounded off the highs.

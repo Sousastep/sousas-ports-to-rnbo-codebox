@@ -1,0 +1,58 @@
+HP-LP LR4 Filters — mrelwood plugins (third-party contribution)
+Page: https://mrelwood5.wixsite.com/plugins
+(This filter has no individual page; it is a third-party LR4 contribution
+listed with mrelwood's plugins and ships inside the free
+mrelwood_PluginPack. Parameters keep the original JSFX slider units.)
+
+What it is: a standalone Linkwitz-Riley-style crossover / HP / LP filter
+bank. It has FOUR outputs in the RNBO port: when Mode is set to
+Crossover, out1/out2 are the LOW-passed audio and out3/out4 are the
+HIGH-passed audio, so you can wire them into two speaker/monitor paths.
+Selectors keep the source's numeric values, including its oddities
+(README note: selector 3 uses seven cascaded biquads rather than the
+labelled twelve poles; 4/5 use seven LP and four HP stages - the source's
+own imperfections are preserved, not "fixed" into a textbook crossover).
+
+Parameters (original names):
+
+- slider2 (Slope selector) 0..5, default 1
+  Numeric pole/slope selector. Discrete steps. 0 = straight passthrough.
+  Higher numbers use progressively more cascaded biquads (steeper slopes,
+  more phase rotation). Selector 1 is the plainest working crossover.
+
+- slider3 (Frequency Scale) 0..1, default 0.5
+  Sets the crossover / HP / LP frequency. It is a SCALE control with a
+  log-ish mapping inside the source, not a direct Hz readout: 0.5 is the
+  central musical range (roughly 300-400 Hz region for typical uses),
+  lower = bassier / lower cutoffs, higher = higher, sharper splits.
+
+- slider4 (Resonance) (dB) -6..+6, default 0
+  Resonance on the filter bank. 0 = proper LR-style flat crossover;
+  negative pulls the passband down (gentler handoff), positive lets the
+  corner ring a little (musical for a filter-y "swoop"). Keep small
+  values to preserve the classic LR4 cancelled-notch behavior.
+
+- slider5 (LP Polarity) 0..1 (0/1 toggle), default 0
+  Inverts the OUTPUT of the low pass filter. Use it if the phase of the
+  crossover audibly fights the source; the standard setup for a two-way
+  LR-type crossover is either both flipped (right for 24 dB/LR4
+  acoustic alignment) or both NOT flipped - flipping one gives the
+  famous sub-bass cancellation "swoop".
+
+- slider6 (HP Polarity) 0..1 (0/1 toggle), default 0
+  Same polarity toggle for the high-pass outputs.
+
+- slider8 (Mode) 0..3, default 0
+  0 = off (plain stereo passthrough),
+  1 = LP only (high band is NOT output on out3/out4),
+  2 = HP only (low band is NOT output on out1/out2),
+  3 = crossover (both: out1/out2 = LOW, out3/out4 = HIGH).
+  Only in Mode 3 do the extra HP outlets carry working audio.
+
+- slider20 (Output) (dB) -24..+24, default 0
+  Straight output trim applied to both bands.
+
+Port quirks (README notes): Off mode (slider8 = 0) passes stereo at
+unity; crossover outputs are never auto-summed within the module, so
+you connect them yourself. The source's passband numerical selectors
+are all preserved as-is.

@@ -1,0 +1,39 @@
+Dynamics3 — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/dynamics3/
+
+What it is: a 2-in-1 downward expander / compressor built on quadratic
+Bezier curves: the curve is literally a Bezier interpolation, re-solving
+each sample, so it reacts like a baked-in continuous curve rather than a
+culled/interpolated conventional attack-release engine. Very clean, very
+"stealth" sounding. This RNBO port uses the original normalized 0..1 values.
+
+Parameters:
+
+- p_thresh (Thresh) 0..1, default 1.0
+  Blend/expander-compressor knee-ish intensity. Internally bezThresh =
+  pow(p+0.618)^2 * 1.618 (quadratic taper, i.e., it moves a lot at the top
+  of the scale). At the default 1.0 the plugin effectively bypasses
+  (bezThresh > 4.236): 1.0 = OFF. Lower values engage it; around 0.6-0.75
+  is a gentle setting, near 0.0 the most aggressive.
+
+- p_attack (Attack) 0..1, default 0.382 (golden-section default)
+  Control-response rate, NOT ms. Internally bezRez = pow((1-p)*0.4, 4) per
+  sample, i.e. a very steep exponential taper: high attack numbers are
+  dramatically slower, and each 0.1 near 0.0 matters a lot more than near
+  1.0... in practice lower p = faster response. The stair-step is hidden by
+  Bezier smoothing, so it never sounds steppy.
+
+- p_release (Release) 0..1, default 0.618
+  Same taper family as Attack for the floor/undershoot (sloRez =
+  pow((1-p)*0.4,4)); lower p = faster release of the curve baseline.
+
+- p_invwet (Inv/Wet) 0..1, default 1.0
+  Direction selector blended with dry/wet. Above 0.5 the module is a
+  compressor, below 0.5 a downward expander. The distance from the 0.5
+  midpoint also blends in dry signal: 0.5 = flat-ish dry, 1.0 or 0.0 = full
+  compressor / full expander. Default 1.0 = full compressor.
+
+Musical notes: typical use is p_thresh 0.7-0.8 as a "transparent glue"
+compressor or a subtle expander on vocals/bass; the Bezier path makes
+deep settings surprisingly clean but hints of over-realness ("controlled"
+sound) can appear at extreme depths.

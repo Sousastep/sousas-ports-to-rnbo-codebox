@@ -1,0 +1,42 @@
+ADClip9 — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/adclip9/
+
+What it is: modernized Airwindows soft-clip clipper. Adds smooth DC coupling
+and a chosen way to relate the clip ceiling to the processed signal. In this
+RNBO port all controls use the original normalized 0..1 values, exactly like
+the source VST parameters.
+
+Parameters (p_boost lastSample... declared order):
+
+- p_boost  (Boost)     0..1, default 0.0
+  Input gain into the clipper. Linearized approximately by ear: internally
+  maps to a 0 to +18 dB range (pow(10, p*18/20)). Useful to push audio into
+  the clipper; 0.5 ≈ +9 dB.
+
+- p_match  (Match)     0..1, default 0.0
+  Same 0 to +18 dB mapping. In mode "Match" the plugin applies this gain,
+  clips, then removes the same amount of level so the result is loud but
+  stays level-matched to the input for A/B purposes.
+
+- p_noise  (Noise)     0..1, default 0.7
+  Mix of randomized dither used when reconstructing clipped tops. Built with
+  a squared curve: noiseLevel = 1 - (1-p)^2, so the perceived change ramps up
+  quickly at first. At 0 the clip is fully deterministic; toward 1 the tops
+  are effectively dithered, which lets some "over" detail survive clipping.
+
+- p_ceiling (Ceiling)  0..1, default 0.75
+  Absolute clip target applied to the processed signal, same squared taper
+  1 - (1-p)^2 so high settings change little while low settings pull down
+  dramatically. Also scales the slew-limiting post-clip behavior. Practical
+  musical effect: lower values = more aggressive, duller clipping.
+
+- p_mode   (Mode)      0..1, default 0.0 (3 discrete positions, thirds)
+  0.0-0.33  Boost  - just the boosted clipped signal
+  0.33-0.67 Match  - boosted clip, level-matched back down (does not use the
+                     Boost gain for the audible path)
+  0.67-1.0  ClipOnly - outputs the clipped signal minus the dry input scaled
+                     by the gain (the "difference" clip, for parallel or
+                     novelty setups)
+
+Musical notes: designed for master/2-buss loudness. Start with mode = Boost,
+raise Boost until the mix gets flatter, then use Noise/Ceiling to taste.

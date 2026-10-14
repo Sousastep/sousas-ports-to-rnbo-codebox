@@ -1,0 +1,229 @@
+/* TapeHack2 — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Input
+@param({ min: 0, max: 1 }) p_input = 0.1;
+// VST B: Output
+@param({ min: 0, max: 1 }) p_output = 1.0;
+// VST C: Dry/Wet
+@param({ min: 0, max: 1 }) p_drywet = 1.0;
+
+@state avg32L = new FixedFloat64Array(33);
+@state avg32R = new FixedFloat64Array(33);
+@state avg16L = new FixedFloat64Array(17);
+@state avg16R = new FixedFloat64Array(17);
+@state avg8L = new FixedFloat64Array(9);
+@state avg8R = new FixedFloat64Array(9);
+@state avg4L = new FixedFloat64Array(5);
+@state avg4R = new FixedFloat64Array(5);
+@state avg2L = new FixedFloat64Array(3);
+@state avg2R = new FixedFloat64Array(3);
+@state post32L = new FixedFloat64Array(33);
+@state post32R = new FixedFloat64Array(33);
+@state post16L = new FixedFloat64Array(17);
+@state post16R = new FixedFloat64Array(17);
+@state post8L = new FixedFloat64Array(9);
+@state post8R = new FixedFloat64Array(9);
+@state post4L = new FixedFloat64Array(5);
+@state post4R = new FixedFloat64Array(5);
+@state post2L = new FixedFloat64Array(3);
+@state post2R = new FixedFloat64Array(3);
+@state lastDarkL = 0;
+@state lastDarkR = 0;
+@state avgPos: Int = 0;
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state spacing: Int = 0;
+@state inputGain = 0;
+@state outputGain = 0;
+@state wet = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+function init() {
+
+	for (let x: Int = 0; x < 33; x++) {avg32L[x] = 0.0; post32L[x] = 0.0; avg32R[x] = 0.0; post32R[x] = 0.0;}
+	for (let x: Int = 0; x < 17; x++) {avg16L[x] = 0.0; post16L[x] = 0.0; avg16R[x] = 0.0; post16R[x] = 0.0;}
+	for (let x: Int = 0; x < 9; x++) {avg8L[x] = 0.0; post8L[x] = 0.0; avg8R[x] = 0.0; post8R[x] = 0.0;}
+	for (let x: Int = 0; x < 5; x++) {avg4L[x] = 0.0; post4L[x] = 0.0; avg4R[x] = 0.0; post4R[x] = 0.0;}
+	for (let x: Int = 0; x < 3; x++) {avg2L[x] = 0.0; post2L[x] = 0.0; avg2R[x] = 0.0; post2R[x] = 0.0;}
+	avgPos = 0;
+	lastDarkL = 0.0; lastDarkR = 0.0;
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 1.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();
+	spacing = floor(overallscale*2.0);
+	if (spacing < 2) spacing = 2; if (spacing > 32) spacing = 32;
+
+	inputGain = p_input*10.0;
+	outputGain = p_output*0.9239;
+	wet = p_drywet;
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+		if (abs(inputSampleL)<1.18e-23) inputSampleL = fpdL * 1.18e-17;
+		if (abs(inputSampleR)<1.18e-23) inputSampleR = fpdR * 1.18e-17;
+		let drySampleL = inputSampleL;
+		let drySampleR = inputSampleR;
+		
+		inputSampleL *= inputGain;
+		inputSampleR *= inputGain;
+		let darkSampleL = inputSampleL;
+		let darkSampleR = inputSampleR;
+		if (avgPos > 31) avgPos = 0;
+		if (spacing > 31) {
+			avg32L[avgPos] = darkSampleL; avg32R[avgPos] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 32; x++) {darkSampleL += avg32L[x]; darkSampleR += avg32R[x];}
+			darkSampleL /= 32.0; darkSampleR /= 32.0;
+		} if (spacing > 15) {
+			avg16L[avgPos%16] = darkSampleL; avg16R[avgPos%16] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 16; x++) {darkSampleL += avg16L[x]; darkSampleR += avg16R[x];}
+			darkSampleL /= 16.0; darkSampleR /= 16.0;
+		} if (spacing > 7) {
+			avg8L[avgPos%8] = darkSampleL; avg8R[avgPos%8] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 8; x++) {darkSampleL += avg8L[x]; darkSampleR += avg8R[x];}
+			darkSampleL /= 8.0; darkSampleR /= 8.0;
+		} if (spacing > 3) {
+			avg4L[avgPos%4] = darkSampleL; avg4R[avgPos%4] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 4; x++) {darkSampleL += avg4L[x]; darkSampleR += avg4R[x];}
+			darkSampleL /= 4.0; darkSampleR /= 4.0;
+		} if (spacing > 1) {
+			avg2L[avgPos%2] = darkSampleL; avg2R[avgPos%2] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 2; x++) {darkSampleL += avg2L[x]; darkSampleR += avg2R[x];}
+			darkSampleL /= 2.0; darkSampleR /= 2.0; 
+		} 
+		let avgSlewL = minimum(abs(lastDarkL-inputSampleL)*0.12*overallscale,1.0);
+		avgSlewL = 1.0-(1.0-avgSlewL*1.0-avgSlewL);
+		inputSampleL = (inputSampleL*(1.0-avgSlewL)) + (darkSampleL*avgSlewL);
+		lastDarkL = darkSampleL;
+		let avgSlewR = minimum(abs(lastDarkR-inputSampleR)*0.12*overallscale,1.0);
+		avgSlewR = 1.0-(1.0-avgSlewR*1.0-avgSlewR);
+		inputSampleR = (inputSampleR*(1.0-avgSlewR)) + (darkSampleR*avgSlewR);
+		lastDarkR = darkSampleR;
+		
+		inputSampleL = maximum(minimum(inputSampleL,2.305929007734908),-2.305929007734908);
+		let addtwo = inputSampleL * inputSampleL;
+		let empower = inputSampleL * addtwo; 
+		inputSampleL -= (empower / 6.0);
+		empower *= addtwo; 
+		inputSampleL += (empower / 69.0);
+		empower *= addtwo; 
+		inputSampleL -= (empower / 2530.08);
+		empower *= addtwo; 
+		inputSampleL += (empower / 224985.6);
+		empower *= addtwo; 
+		inputSampleL -= (empower / 9979200.0);
+		
+		inputSampleR = maximum(minimum(inputSampleR,2.305929007734908),-2.305929007734908);
+		addtwo = inputSampleR * inputSampleR;
+		empower = inputSampleR * addtwo; 
+		inputSampleR -= (empower / 6.0);
+		empower *= addtwo; 
+		inputSampleR += (empower / 69.0);
+		empower *= addtwo; 
+		inputSampleR -= (empower / 2530.08);
+		empower *= addtwo; 
+		inputSampleR += (empower / 224985.6);
+		empower *= addtwo; 
+		inputSampleR -= (empower / 9979200.0);
+
+		darkSampleL = inputSampleL;
+		darkSampleR = inputSampleR;
+		if (avgPos > 31) avgPos = 0;
+		if (spacing > 31) {
+			post32L[avgPos] = darkSampleL; post32R[avgPos] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 32; x++) {darkSampleL += post32L[x]; darkSampleR += post32R[x];}
+			darkSampleL /= 32.0; darkSampleR /= 32.0;
+		} if (spacing > 15) {
+			post16L[avgPos%16] = darkSampleL; post16R[avgPos%16] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 16; x++) {darkSampleL += post16L[x]; darkSampleR += post16R[x];}
+			darkSampleL /= 16.0; darkSampleR /= 16.0;
+		} if (spacing > 7) {
+			post8L[avgPos%8] = darkSampleL; post8R[avgPos%8] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 8; x++) {darkSampleL += post8L[x]; darkSampleR += post8R[x];}
+			darkSampleL /= 8.0; darkSampleR /= 8.0;
+		} if (spacing > 3) {
+			post4L[avgPos%4] = darkSampleL; post4R[avgPos%4] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 4; x++) {darkSampleL += post4L[x]; darkSampleR += post4R[x];}
+			darkSampleL /= 4.0; darkSampleR /= 4.0;
+		} if (spacing > 1) {
+			post2L[avgPos%2] = darkSampleL; post2R[avgPos%2] = darkSampleR;
+			darkSampleL = 0.0; darkSampleR = 0.0;
+			for (let x: Int = 0; x < 2; x++) {darkSampleL += post2L[x]; darkSampleR += post2R[x];}
+			darkSampleL /= 2.0; darkSampleR /= 2.0; 
+		} avgPos++;
+		inputSampleL = (inputSampleL*(1.0-avgSlewL)) + (darkSampleL*avgSlewL);
+		inputSampleR = (inputSampleR*(1.0-avgSlewR)) + (darkSampleR*avgSlewR);
+
+		inputSampleL = (inputSampleL * outputGain * wet) + (drySampleL * (1.0-wet));
+		inputSampleR = (inputSampleR * outputGain * wet) + (drySampleR * (1.0-wet));
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

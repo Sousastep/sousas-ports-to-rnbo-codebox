@@ -1,0 +1,197 @@
+// BandbAss 0.02 by mrelwood — RNBO codebox~ DSP port.
+// in1/in2: main L/R; in3: kick sidechain; in4: optional second sidechain.
+// out1/out2: processed L/R. No graphics or passthrough sidechain outlets.
+// Source defaults to MONO (averages main inputs). Stereo still uses the
+// LEFT main envelope to control both channels, exactly as in the JSFX.
+// No kick input means no ducking after initial gain recovery: the source
+// does not implement the standalone compressor described in its about text.
+// attack/hold/release are original slider positions, not literal times;
+// the same nonlinear mappings are preserved.
+@param({ min: 100, max: 500 }) crossover = 200;
+@param({ min: -40, max: 0 }) threshold_kick = -20;
+@param({ min: -40, max: 0 }) threshold_bass = -20;
+@param({ min: 0, max: 50 }) attack = 0;
+@param({ min: 0, max: 100 }) hold = 0;
+@param({ min: 10, max: 300 }) release = 30;
+@param({ min: 0, max: 200 }) depth = 100;
+@param({ enum: ["Mono", "Stereo"] }) stereo = 0;
+// Auto is the original slider10 default (0). -1 disabled, +1 enabled.
+@param({ min: -1, max: 1 }) channel4 = 0;
+// Source threshold linking is only a GUI gesture, not a DSP operation.
+// Here linking explicitly makes threshold_bass follow threshold_kick.
+@param({ enum: ["Separate", "Link"] }) link_thresholds = 1;
+
+// Six independent five-biquad cascades: kick LP, main LP/HP,
+// right main LP/HP and optional second sidechain LP.
+@state filters = new FixedFloat64Array(6, 5, 4);
+// Per detector: peak, peak counter, envelope, envelope counter.
+@state envelopes = new FixedFloat64Array(4, 4);
+// Original JSFX instance variables start at zero, including compressor gain.
+@state gains = new FixedFloat64Array(3, 2);
+@state lpco = new FixedFloat64Array(5);
+@state hpco = new FixedFloat64Array(5);
+@state atts = 1;
+@state holds = 1;
+@state rels = 1;
+@state thr = 0.1;
+@state thr2 = 0.1;
+@state depth1 = 1;
+@state depth2 = 1;
+@state thirds = 0;
+@state secmode = 0;
+@state oldChannel4 = 99;
+@state sleepc = 0;
+@state sleeping = 0;
+@state frame: Int = 0;
+function dspsetup() { frame = 0; }
+
+function filterCascade(x, bank: Int, highpass) {
+    for (let stage: Int = 0; stage < 5; stage++) {
+        let y = 0;
+        if (highpass != 0) {
+            y = hpco[0]*x+hpco[1]*filters[bank][stage][0]+hpco[2]*filters[bank][stage][1]
+                -hpco[3]*filters[bank][stage][2]-hpco[4]*filters[bank][stage][3];
+        } else {
+            y = lpco[0]*x+lpco[1]*filters[bank][stage][0]+lpco[2]*filters[bank][stage][1]
+                -lpco[3]*filters[bank][stage][2]-lpco[4]*filters[bank][stage][3];
+        }
+        filters[bank][stage][1] = filters[bank][stage][0];
+        filters[bank][stage][0] = x;
+        filters[bank][stage][3] = filters[bank][stage][2];
+        filters[bank][stage][2] = y;
+        x = y;
+    }
+    return x;
+}
+function envelope(x, speed, bank: Int) {
+    let ina = abs(x);
+    let pk = envelopes[bank][0];
+    let pkc = envelopes[bank][1];
+    let flt = envelopes[bank][2];
+    let fc = envelopes[bank][3];
+    if (ina > pk) {
+        pk = ina;
+        pkc = 0;
+    } else {
+        let pkrels = samplerate()*(0.04-0.02*speed);
+        if (pkc < pkrels) pkc++;
+        pk -= (pk+(pk-ina))*0.001*(0.1+0.9*speed)*minimum(1, pkc/pkrels);
+        // EEL evaluates division by zero to zero. Make silence well-defined.
+        let ratio = 0;
+        if (pk != 0) ratio = ina/pk;
+        pkc /= 1+0.2*minimum(1, maximum(0, ratio-0.8)/0.2);
+    }
+    if (pk > flt) {
+        flt = pk;
+        fc = -holds-atts;
+    } else {
+        fc++;
+        if (fc > 0) flt -= (flt-pk)*0.003*minimum(1, fc/rels)/(1+(holds+atts)*0.001);
+    }
+    envelopes[bank][0] = pk;
+    envelopes[bank][1] = pkc;
+    envelopes[bank][2] = flt;
+    envelopes[bank][3] = fc;
+    return flt;
+}
+function compress(level, threshold, bank: Int) {
+    let target = 1;
+    if (level != 0) target = minimum(1, threshold/level);
+    let gain = gains[bank][0];
+    let rc = gains[bank][1];
+    if (target < gain) {
+        gain -= (gain-target)/atts;
+        rc = 0;
+    } else {
+        if (rc < rels) rc++;
+        gain += (target-gain)/(rels*0.4)*maximum(0, rc/rels);
+    }
+    gains[bank][0] = gain;
+    gains[bank][1] = rc;
+    return gain;
+}
+if (frame == 0) {
+    thr = pow(2, threshold_kick/6);
+    thr2 = pow(2, threshold_bass/6);
+    if (link_thresholds != 0) thr2 = thr;
+    let av = attack/50;
+    atts = samplerate()*((av*0.5+0.5*av*av)*50*0.001)+1;
+    let hv = hold/100;
+    holds = samplerate()*((hv*0.5+0.5*hv*hv)*100*0.001)+1;
+    let rv = (release-5)/295;
+    rels = samplerate()*((5+(rv*0.25+0.75*rv*rv)*295)*0.001)+1;
+    depth1 = minimum(1, depth/100);
+    depth2 = maximum(1, depth/100);
+    if (channel4 != oldChannel4) {
+        secmode = channel4;
+        oldChannel4 = channel4;
+    }
+    if (thirds > 100 && secmode == 0) secmode = 1;
+    let resonance = pow(10, 0.05*(5.2/5+1.5));
+    for (let mode: Int = 0; mode < 2; mode++) {
+        let frequency = crossover*1.2;
+        if (mode == 1) frequency = crossover*0.8;
+        let omega = PI*2*frequency/samplerate();
+        let k = 0.5*resonance*sin(omega);
+        let c1 = 0.5*(1-k)/(1+k);
+        let c2 = (0.5+c1)*cos(omega);
+        let c3 = (0.5+c1-c2)*0.25;
+        if (mode == 1) c3 = (0.5+c1+c2)*0.25;
+        if (mode == 0) {
+            lpco[0] = 2*c3; lpco[1] = 4*c3; lpco[2] = 2*c3;
+            lpco[3] = -2*c2; lpco[4] = 2*c1;
+        } else {
+            hpco[0] = 2*c3; hpco[1] = -4*c3; hpco[2] = 2*c3;
+            hpco[3] = -2*c2; hpco[4] = 2*c1;
+        }
+    }
+}
+if (in1 == 0 && in2 == 0) {
+    sleepc++;
+    if (sleepc > samplerate()*5) sleeping = 1;
+} else {
+    sleepc = 0;
+    sleeping = 0;
+}
+let kicklp = filterCascade(in3, 0, 0);
+let kickflt = envelope(kicklp, 1, 0);
+let kickg = compress(kickflt, thr, 0);
+let left = in1;
+let right = in2;
+if (!sleeping) {
+    let main = (in1+in2)*0.5;
+    if (stereo != 0) main = in1;
+    let mainlp = filterCascade(main, 1, 0);
+    let mainhp = filterCascade(main, 2, 1);
+    let mainlp2 = 0;
+    let mainhp2 = 0;
+    if (stereo != 0) {
+        mainlp2 = filterCascade(in2, 3, 0);
+        mainhp2 = filterCascade(in2, 4, 1);
+        let unusedRightEnvelope = envelope(mainlp2, 0.1, 3);
+    }
+    let mainflt = envelope(mainlp, 0.1, 1);
+    if (secmode == 0) {
+        if (in4 != 0) thirds++;
+        else if (thirds > 0) thirds--;
+    }
+    let maincomp = 0;
+    let maing = 1;
+    if (secmode == 1) {
+        let seclp = filterCascade(in4, 5, 0);
+        let secflt = envelope(seclp, 0.3, 2);
+        let secg = compress(secflt, thr2, 2);
+        maincomp = compress(mainflt, thr, 1);
+        maing = pow(1-(1-maincomp)*(1-kickg*secg)*depth1, depth2);
+    } else {
+        maincomp = compress(mainflt, thr, 1);
+        maing = pow(1-(1-maincomp)*(1-pow(kickg,4))*depth1, depth2);
+    }
+    left = mainlp*maing+mainhp;
+    right = left;
+    if (stereo != 0) right = mainlp2*maing+mainhp2;
+}
+out1 = left;
+out2 = right;
+frame++;
+if (frame >= vectorsize()) frame = 0;

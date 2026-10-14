@@ -1,0 +1,590 @@
+/* mrelwood_GateIQ — RNBO codebox~ port of mrelwood source.
+ * Stereo in1/in2 -> out1/out2; original slider units and defaults.
+ * Graphics and GUI meters omitted. See RNBO/README.md and VALIDATION.md.
+ * desc: GateIQ 0v2  [mrelwood]
+ * 
+ * 
+ * 
+ */
+// Threshold (dB)
+@param({ min: -96, max: -6 }) slider1 = -45;
+// Range (dB)
+@param({ min: 0, max: 48 }) slider2 = 20;
+// Threshold Hi (dB)
+@param({ min: -12, max: 12 }) slider4 = 0;
+// Threshold HiMid (dB)
+@param({ min: -12, max: 12 }) slider5 = 0;
+// Threshold LoMid (dB)
+@param({ min: -12, max: 12 }) slider6 = 0;
+// Threshold Lo (dB)
+@param({ min: -12, max: 12 }) slider7 = 0;
+@state s_initialized = 0;
+@state frame: Int = 0;
+@state prepared = 0;
+@state s_att = 0;
+@state s_draggin = 0;
+@state s_higate__thr = 0;
+@state s_higate_c = 0;
+@state s_higate_flt = 0;
+@state s_higate_g = 0;
+@state s_higate_g0 = 0;
+@state s_higate_gateg = 0;
+@state s_higate_gateg_db = 0;
+@state s_higate_ina = 0;
+@state s_higate_rc = 0;
+@state s_higate_reldura = 0;
+@state s_higate_tgt = 0;
+@state s_higate_thr2 = 0;
+@state s_higate_thr3 = 0;
+@state s_himidgate__thr = 0;
+@state s_himidgate_c = 0;
+@state s_himidgate_flt = 0;
+@state s_himidgate_g = 0;
+@state s_himidgate_g0 = 0;
+@state s_himidgate_gateg = 0;
+@state s_himidgate_gateg_db = 0;
+@state s_himidgate_ina = 0;
+@state s_himidgate_rc = 0;
+@state s_himidgate_reldura = 0;
+@state s_himidgate_tgt = 0;
+@state s_himidgate_thr2 = 0;
+@state s_himidgate_thr3 = 0;
+@state s_ina0HI = 0;
+@state s_ina0LOW = 0;
+@state s_ina0MID = 0;
+@state s_inb1HI = 0;
+@state s_inb1LOW = 0;
+@state s_inb1MID = 0;
+@state s_infreqHI = 0;
+@state s_infreqLOW = 0;
+@state s_infreqMID = 0;
+@state s_inhi0 = 0;
+@state s_inhighS0 = 0;
+@state s_inhimidS0 = 0;
+@state s_inlomidS0 = 0;
+@state s_inlow0 = 0;
+@state s_inlowestS0 = 0;
+@state s_ins0 = 0;
+@state s_intmplHI = 0;
+@state s_intmplLOW = 0;
+@state s_intmplMID = 0;
+@state s_inxHI = 0;
+@state s_inxLOW = 0;
+@state s_inxMID = 0;
+@state s_logate__thr = 0;
+@state s_logate_c = 0;
+@state s_logate_flt = 0;
+@state s_logate_g = 0;
+@state s_logate_g0 = 0;
+@state s_logate_gateg = 0;
+@state s_logate_gateg_db = 0;
+@state s_logate_ina = 0;
+@state s_logate_rc = 0;
+@state s_logate_reldura = 0;
+@state s_logate_tgt = 0;
+@state s_logate_thr2 = 0;
+@state s_logate_thr3 = 0;
+@state s_lomidgate__thr = 0;
+@state s_lomidgate_c = 0;
+@state s_lomidgate_flt = 0;
+@state s_lomidgate_g = 0;
+@state s_lomidgate_g0 = 0;
+@state s_lomidgate_gateg = 0;
+@state s_lomidgate_gateg_db = 0;
+@state s_lomidgate_ina = 0;
+@state s_lomidgate_rc = 0;
+@state s_lomidgate_reldura = 0;
+@state s_lomidgate_tgt = 0;
+@state s_lomidgate_thr2 = 0;
+@state s_lomidgate_thr3 = 0;
+@state s_range = 0;
+@state s_rangedb = 0;
+@state s_rel = 0;
+@state s_slider10 = 0;
+@state s_slider11 = 0;
+@state s_slider12 = 0;
+@state s_slider13 = 0;
+@state s_spl0 = 0;
+@state s_spl1 = 0;
+@state s_thr1_ = 0;
+@state s_thr2_ = 0;
+@state s_thr3_ = 0;
+@state s_thr4_ = 0;
+@state s_thrdb = 0;
+@state s_thrs = 0;
+// EEL division by zero returns zero; RNBO arithmetic does not.
+function eelDivide(a,b) { return b == 0 ? 0 : a/b; }
+function fn_higate_gate(arg_in, arg_thr, arg_ran) {
+s_att = 1;
+s_rel = .15;
+s_higate__thr = arg_thr;
+let tmp11 = arg_in;
+s_higate_ina = abs(tmp11);
+arg_ran = 1;
+s_higate_thr2 = (arg_thr * .7);
+s_higate_thr3 = (arg_thr * .35);
+let tmp20 = 0;
+if (s_higate_ina > s_higate_flt) {
+s_higate_flt += eelDivide(((s_higate_ina - s_higate_flt) * 1),(1 + (pow(s_att,2) * 10)));
+s_higate_c = (0 - 300);
+tmp20 = s_higate_c;
+} else {
+let tmp14 = 0;
+if ((s_higate_ina > (s_higate_flt * .85))) {
+let tmp12 = 0;
+let tmp13 = s_higate_c;
+s_higate_c = minimum(tmp12, tmp13);
+tmp14 = s_higate_c;
+} else {
+tmp14 = 0;
+}
+let tmp15 = 0;
+if (s_higate_c < 1000) {
+s_higate_c += 1;
+tmp15 = s_higate_c;
+} else {
+tmp15 = 0;
+}
+let tmp16 = 1;
+let tmp17 = 0;
+let tmp18 = eelDivide(s_higate_c,1000);
+let tmp19 = (maximum(tmp17, tmp18) + .01);
+s_higate_flt += eelDivide((((s_higate_ina - s_higate_flt) * pow(minimum(tmp16, tmp19),3)) * .01),(1 + (99 * pow(s_rel,2))));
+tmp20 = s_higate_flt;
+}
+let tmp31 = 0;
+if (s_higate_flt > arg_thr) {
+let tmp21 = 0;
+if (s_higate_g0 < 1) {
+s_higate_g0 += eelDivide(.1,(1 + (29 * pow(s_att,2))));
+tmp21 = s_higate_g0;
+} else {
+s_higate_g0 = 1;
+tmp21 = s_higate_g0;
+}
+s_higate_reldura = 0;
+s_higate_rc = s_higate_reldura;
+tmp31 = s_higate_rc;
+} else {
+s_higate_rc += 1;
+let tmp22 = 0;
+if (((s_higate_flt < s_higate_thr2) && (s_higate_reldura == 0))) {
+s_higate_reldura = eelDivide(s_higate_rc,eelDivide(samplerate(),10));
+tmp22 = s_higate_reldura;
+} else {
+tmp22 = 0;
+}
+let tmp23 = 1;
+let tmp24 = 0;
+let tmp25 = (s_higate_flt - s_higate_thr3);
+let tmp26 = eelDivide(maximum(tmp24, tmp25),(arg_thr - s_higate_thr3));
+s_higate_tgt = pow(minimum(tmp23, tmp26),1);
+let tmp27 = (pow((s_higate_g0 - s_higate_tgt),1) * eelDivide(1,(1 + ((pow(s_rel,2) * 2) * samplerate()))));
+let tmp28 = eelDivide(1,(samplerate() * .1));
+s_higate_g0 -= minimum(tmp27, tmp28);
+let tmp29 = 0;
+let tmp30 = s_higate_g0;
+s_higate_g0 = maximum(tmp29, tmp30);
+tmp31 = s_higate_g0;
+}
+let tmp32 = (s_higate_g0 * 3.14);
+s_higate_g = (1 - (pow((.5 + (.5 * cos(tmp32))),2) * s_range));
+s_higate_gateg = s_higate_g;
+let tmp33 = s_higate_gateg;
+s_higate_gateg_db = (log10(maximum(1e-30, tmp33)) * 19.93);
+return s_higate_g;
+}
+
+function fn_himidgate_gate(arg_in, arg_thr, arg_ran) {
+s_att = 1;
+s_rel = .15;
+s_himidgate__thr = arg_thr;
+let tmp37 = arg_in;
+s_himidgate_ina = abs(tmp37);
+arg_ran = 1;
+s_himidgate_thr2 = (arg_thr * .7);
+s_himidgate_thr3 = (arg_thr * .35);
+let tmp46 = 0;
+if (s_himidgate_ina > s_himidgate_flt) {
+s_himidgate_flt += eelDivide(((s_himidgate_ina - s_himidgate_flt) * 1),(1 + (pow(s_att,2) * 10)));
+s_himidgate_c = (0 - 300);
+tmp46 = s_himidgate_c;
+} else {
+let tmp40 = 0;
+if ((s_himidgate_ina > (s_himidgate_flt * .85))) {
+let tmp38 = 0;
+let tmp39 = s_himidgate_c;
+s_himidgate_c = minimum(tmp38, tmp39);
+tmp40 = s_himidgate_c;
+} else {
+tmp40 = 0;
+}
+let tmp41 = 0;
+if (s_himidgate_c < 1000) {
+s_himidgate_c += 1;
+tmp41 = s_himidgate_c;
+} else {
+tmp41 = 0;
+}
+let tmp42 = 1;
+let tmp43 = 0;
+let tmp44 = eelDivide(s_himidgate_c,1000);
+let tmp45 = (maximum(tmp43, tmp44) + .01);
+s_himidgate_flt += eelDivide((((s_himidgate_ina - s_himidgate_flt) * pow(minimum(tmp42, tmp45),3)) * .01),(1 + (99 * pow(s_rel,2))));
+tmp46 = s_himidgate_flt;
+}
+let tmp57 = 0;
+if (s_himidgate_flt > arg_thr) {
+let tmp47 = 0;
+if (s_himidgate_g0 < 1) {
+s_himidgate_g0 += eelDivide(.1,(1 + (29 * pow(s_att,2))));
+tmp47 = s_himidgate_g0;
+} else {
+s_himidgate_g0 = 1;
+tmp47 = s_himidgate_g0;
+}
+s_himidgate_reldura = 0;
+s_himidgate_rc = s_himidgate_reldura;
+tmp57 = s_himidgate_rc;
+} else {
+s_himidgate_rc += 1;
+let tmp48 = 0;
+if (((s_himidgate_flt < s_himidgate_thr2) && (s_himidgate_reldura == 0))) {
+s_himidgate_reldura = eelDivide(s_himidgate_rc,eelDivide(samplerate(),10));
+tmp48 = s_himidgate_reldura;
+} else {
+tmp48 = 0;
+}
+let tmp49 = 1;
+let tmp50 = 0;
+let tmp51 = (s_himidgate_flt - s_himidgate_thr3);
+let tmp52 = eelDivide(maximum(tmp50, tmp51),(arg_thr - s_himidgate_thr3));
+s_himidgate_tgt = pow(minimum(tmp49, tmp52),1);
+let tmp53 = (pow((s_himidgate_g0 - s_himidgate_tgt),1) * eelDivide(1,(1 + ((pow(s_rel,2) * 2) * samplerate()))));
+let tmp54 = eelDivide(1,(samplerate() * .1));
+s_himidgate_g0 -= minimum(tmp53, tmp54);
+let tmp55 = 0;
+let tmp56 = s_himidgate_g0;
+s_himidgate_g0 = maximum(tmp55, tmp56);
+tmp57 = s_himidgate_g0;
+}
+let tmp58 = (s_himidgate_g0 * 3.14);
+s_himidgate_g = (1 - (pow((.5 + (.5 * cos(tmp58))),2) * s_range));
+s_himidgate_gateg = s_himidgate_g;
+let tmp59 = s_himidgate_gateg;
+s_himidgate_gateg_db = (log10(maximum(1e-30, tmp59)) * 19.93);
+return s_himidgate_g;
+}
+
+function fn_lomidgate_gate(arg_in, arg_thr, arg_ran) {
+s_att = 1;
+s_rel = .15;
+s_lomidgate__thr = arg_thr;
+let tmp63 = arg_in;
+s_lomidgate_ina = abs(tmp63);
+arg_ran = 1;
+s_lomidgate_thr2 = (arg_thr * .7);
+s_lomidgate_thr3 = (arg_thr * .35);
+let tmp72 = 0;
+if (s_lomidgate_ina > s_lomidgate_flt) {
+s_lomidgate_flt += eelDivide(((s_lomidgate_ina - s_lomidgate_flt) * 1),(1 + (pow(s_att,2) * 10)));
+s_lomidgate_c = (0 - 300);
+tmp72 = s_lomidgate_c;
+} else {
+let tmp66 = 0;
+if ((s_lomidgate_ina > (s_lomidgate_flt * .85))) {
+let tmp64 = 0;
+let tmp65 = s_lomidgate_c;
+s_lomidgate_c = minimum(tmp64, tmp65);
+tmp66 = s_lomidgate_c;
+} else {
+tmp66 = 0;
+}
+let tmp67 = 0;
+if (s_lomidgate_c < 1000) {
+s_lomidgate_c += 1;
+tmp67 = s_lomidgate_c;
+} else {
+tmp67 = 0;
+}
+let tmp68 = 1;
+let tmp69 = 0;
+let tmp70 = eelDivide(s_lomidgate_c,1000);
+let tmp71 = (maximum(tmp69, tmp70) + .01);
+s_lomidgate_flt += eelDivide((((s_lomidgate_ina - s_lomidgate_flt) * pow(minimum(tmp68, tmp71),3)) * .01),(1 + (99 * pow(s_rel,2))));
+tmp72 = s_lomidgate_flt;
+}
+let tmp83 = 0;
+if (s_lomidgate_flt > arg_thr) {
+let tmp73 = 0;
+if (s_lomidgate_g0 < 1) {
+s_lomidgate_g0 += eelDivide(.1,(1 + (29 * pow(s_att,2))));
+tmp73 = s_lomidgate_g0;
+} else {
+s_lomidgate_g0 = 1;
+tmp73 = s_lomidgate_g0;
+}
+s_lomidgate_reldura = 0;
+s_lomidgate_rc = s_lomidgate_reldura;
+tmp83 = s_lomidgate_rc;
+} else {
+s_lomidgate_rc += 1;
+let tmp74 = 0;
+if (((s_lomidgate_flt < s_lomidgate_thr2) && (s_lomidgate_reldura == 0))) {
+s_lomidgate_reldura = eelDivide(s_lomidgate_rc,eelDivide(samplerate(),10));
+tmp74 = s_lomidgate_reldura;
+} else {
+tmp74 = 0;
+}
+let tmp75 = 1;
+let tmp76 = 0;
+let tmp77 = (s_lomidgate_flt - s_lomidgate_thr3);
+let tmp78 = eelDivide(maximum(tmp76, tmp77),(arg_thr - s_lomidgate_thr3));
+s_lomidgate_tgt = pow(minimum(tmp75, tmp78),1);
+let tmp79 = (pow((s_lomidgate_g0 - s_lomidgate_tgt),1) * eelDivide(1,(1 + ((pow(s_rel,2) * 2) * samplerate()))));
+let tmp80 = eelDivide(1,(samplerate() * .1));
+s_lomidgate_g0 -= minimum(tmp79, tmp80);
+let tmp81 = 0;
+let tmp82 = s_lomidgate_g0;
+s_lomidgate_g0 = maximum(tmp81, tmp82);
+tmp83 = s_lomidgate_g0;
+}
+let tmp84 = (s_lomidgate_g0 * 3.14);
+s_lomidgate_g = (1 - (pow((.5 + (.5 * cos(tmp84))),2) * s_range));
+s_lomidgate_gateg = s_lomidgate_g;
+let tmp85 = s_lomidgate_gateg;
+s_lomidgate_gateg_db = (log10(maximum(1e-30, tmp85)) * 19.93);
+return s_lomidgate_g;
+}
+
+function fn_logate_gate(arg_in, arg_thr, arg_ran) {
+s_att = 1;
+s_rel = .15;
+s_logate__thr = arg_thr;
+let tmp89 = arg_in;
+s_logate_ina = abs(tmp89);
+arg_ran = 1;
+s_logate_thr2 = (arg_thr * .7);
+s_logate_thr3 = (arg_thr * .35);
+let tmp98 = 0;
+if (s_logate_ina > s_logate_flt) {
+s_logate_flt += eelDivide(((s_logate_ina - s_logate_flt) * 1),(1 + (pow(s_att,2) * 10)));
+s_logate_c = (0 - 300);
+tmp98 = s_logate_c;
+} else {
+let tmp92 = 0;
+if ((s_logate_ina > (s_logate_flt * .85))) {
+let tmp90 = 0;
+let tmp91 = s_logate_c;
+s_logate_c = minimum(tmp90, tmp91);
+tmp92 = s_logate_c;
+} else {
+tmp92 = 0;
+}
+let tmp93 = 0;
+if (s_logate_c < 1000) {
+s_logate_c += 1;
+tmp93 = s_logate_c;
+} else {
+tmp93 = 0;
+}
+let tmp94 = 1;
+let tmp95 = 0;
+let tmp96 = eelDivide(s_logate_c,1000);
+let tmp97 = (maximum(tmp95, tmp96) + .01);
+s_logate_flt += eelDivide((((s_logate_ina - s_logate_flt) * pow(minimum(tmp94, tmp97),3)) * .01),(1 + (99 * pow(s_rel,2))));
+tmp98 = s_logate_flt;
+}
+let tmp109 = 0;
+if (s_logate_flt > arg_thr) {
+let tmp99 = 0;
+if (s_logate_g0 < 1) {
+s_logate_g0 += eelDivide(.1,(1 + (29 * pow(s_att,2))));
+tmp99 = s_logate_g0;
+} else {
+s_logate_g0 = 1;
+tmp99 = s_logate_g0;
+}
+s_logate_reldura = 0;
+s_logate_rc = s_logate_reldura;
+tmp109 = s_logate_rc;
+} else {
+s_logate_rc += 1;
+let tmp100 = 0;
+if (((s_logate_flt < s_logate_thr2) && (s_logate_reldura == 0))) {
+s_logate_reldura = eelDivide(s_logate_rc,eelDivide(samplerate(),10));
+tmp100 = s_logate_reldura;
+} else {
+tmp100 = 0;
+}
+let tmp101 = 1;
+let tmp102 = 0;
+let tmp103 = (s_logate_flt - s_logate_thr3);
+let tmp104 = eelDivide(maximum(tmp102, tmp103),(arg_thr - s_logate_thr3));
+s_logate_tgt = pow(minimum(tmp101, tmp104),1);
+let tmp105 = (pow((s_logate_g0 - s_logate_tgt),1) * eelDivide(1,(1 + ((pow(s_rel,2) * 2) * samplerate()))));
+let tmp106 = eelDivide(1,(samplerate() * .1));
+s_logate_g0 -= minimum(tmp105, tmp106);
+let tmp107 = 0;
+let tmp108 = s_logate_g0;
+s_logate_g0 = maximum(tmp107, tmp108);
+tmp109 = s_logate_g0;
+}
+let tmp110 = (s_logate_g0 * 3.14);
+s_logate_g = (1 - (pow((.5 + (.5 * cos(tmp110))),2) * s_range));
+s_logate_gateg = s_logate_g;
+let tmp111 = s_logate_gateg;
+s_logate_gateg_db = (log10(maximum(1e-30, tmp111)) * 19.93);
+return s_logate_g;
+}
+function dspsetup() { frame = 0; prepared = 0;s_inxHI=exp(-2*PI*5000/samplerate());s_ina0HI=1-s_inxHI;s_inb1HI=0-s_inxHI;s_inxMID=exp(-2*PI*1500/samplerate());s_ina0MID=1-s_inxMID;s_inb1MID=0-s_inxMID;s_inxLOW=exp(-2*PI*200/samplerate());s_ina0LOW=1-s_inxLOW;s_inb1LOW=0-s_inxLOW; }
+if (prepared == 0) {
+if (prepared == 0 && s_initialized == 0) {
+s_infreqLOW = 200;
+s_infreqMID = 1500;
+s_infreqHI = 5000;
+let tmp1 = eelDivide((((0 - 2.0) * PI) * s_infreqHI),samplerate());
+s_inxHI = exp(tmp1);
+s_ina0HI = (1.0 - s_inxHI);
+s_inb1HI = (0 - s_inxHI);
+let tmp2 = eelDivide((((0 - 2.0) * PI) * s_infreqMID),samplerate());
+s_inxMID = exp(tmp2);
+s_ina0MID = (1.0 - s_inxMID);
+s_inb1MID = (0 - s_inxMID);
+let tmp3 = eelDivide((((0 - 2.0) * PI) * s_infreqLOW),samplerate());
+s_inxLOW = exp(tmp3);
+s_ina0LOW = (1.0 - s_inxLOW);
+s_inb1LOW = (0 - s_inxLOW);
+
+s_initialized = 1;
+}
+prepared = 1;
+}
+@state previousControls = new FixedFloat64Array(6);
+@state controlsReady = 0;
+if (frame == 0) {
+let changed = controlsReady == 0;
+if (previousControls[0] != slider1) changed = 1;
+previousControls[0] = slider1;
+if (previousControls[1] != slider2) changed = 1;
+previousControls[1] = slider2;
+if (previousControls[2] != slider4) changed = 1;
+previousControls[2] = slider4;
+if (previousControls[3] != slider5) changed = 1;
+previousControls[3] = slider5;
+if (previousControls[4] != slider6) changed = 1;
+previousControls[4] = slider6;
+if (previousControls[5] != slider7) changed = 1;
+previousControls[5] = slider7;
+if (changed) {
+let tmp4 = 0;
+if (s_thrdb != slider1) {
+s_draggin = (samplerate() * .5);
+tmp4 = s_draggin;
+} else {
+tmp4 = 0;
+}
+s_thrdb = slider1;
+let tmp5 = 0;
+if ((s_thrdb <= (0 - 96))) {
+s_thrs = 0;
+tmp5 = s_thrs;
+} else {
+s_thrs = pow(2,eelDivide(s_thrdb,6));
+tmp5 = s_thrs;
+}
+s_rangedb = slider2;
+let tmp6 = 0;
+if (s_rangedb >= 48) {
+s_range = 1;
+tmp6 = s_range;
+} else {
+s_range = (1 - pow(2,eelDivide((0 - slider2),6)));
+tmp6 = s_range;
+}
+s_thr1_ = pow(2,eelDivide(slider4,6));
+s_thr2_ = pow(2,eelDivide(slider5,6));
+s_thr3_ = pow(2,eelDivide(slider6,6));
+s_thr4_ = pow(2,eelDivide(slider7,6));
+
+controlsReady = 1;
+}
+
+}
+s_spl0 = in1;
+s_spl1 = in2;
+let tmp7 = 0;
+if (s_draggin > 0) {
+s_draggin -= 1;
+tmp7 = s_draggin;
+} else {
+s_draggin = 0;
+tmp7 = s_draggin;
+}
+let tmp116 = 0;
+if ((s_thrdb > (0 - 96))) {
+s_ins0 = ((s_spl0 + s_spl1) * .5);
+s_intmplMID = ((s_ina0MID * s_ins0) - (s_inb1MID * s_intmplMID));
+s_inlow0 = s_intmplMID;
+s_intmplLOW = ((s_ina0LOW * s_inlow0) - (s_inb1LOW * s_intmplLOW));
+s_inlowestS0 = s_intmplLOW;
+s_inlomidS0 = (s_inlow0 - s_inlowestS0);
+s_inhi0 = (s_ins0 - s_inlow0);
+s_intmplHI = ((s_ina0HI * s_inhi0) - (s_inb1HI * s_intmplHI));
+s_inhimidS0 = s_intmplHI;
+s_inhighS0 = (s_inhi0 - s_inhimidS0);
+let tmp8 = s_inhighS0;
+let tmp9 = ((s_thrs * .05) * s_thr1_);
+let tmp10 = 0.001;
+s_inhighS0 *= fn_higate_gate(tmp8, tmp9, tmp10);
+let tmp34 = s_inhimidS0;
+let tmp35 = ((s_thrs * .7) * s_thr2_);
+let tmp36 = 0.001;
+s_inhimidS0 *= fn_himidgate_gate(tmp34, tmp35, tmp36);
+let tmp60 = s_inlomidS0;
+let tmp61 = ((s_thrs * 1.4) * s_thr3_);
+let tmp62 = 0.001;
+s_inlomidS0 *= fn_lomidgate_gate(tmp60, tmp61, tmp62);
+let tmp86 = s_inlowestS0;
+let tmp87 = ((s_thrs * 0.55) * s_thr4_);
+let tmp88 = 0.001;
+s_inlowestS0 *= fn_logate_gate(tmp86, tmp87, tmp88);
+let tmp112 = 0;
+if (s_higate_g == 0) {
+tmp112 = (0 - 96);
+} else {
+tmp112 = s_higate_gateg_db;
+}
+s_slider10 = tmp112;
+let tmp113 = 0;
+if (s_himidgate_g == 0) {
+tmp113 = (0 - 96);
+} else {
+tmp113 = s_himidgate_gateg_db;
+}
+s_slider11 = tmp113;
+let tmp114 = 0;
+if (s_lomidgate_g == 0) {
+tmp114 = (0 - 96);
+} else {
+tmp114 = s_lomidgate_gateg_db;
+}
+s_slider12 = tmp114;
+let tmp115 = 0;
+if (s_logate_g == 0) {
+tmp115 = (0 - 96);
+} else {
+tmp115 = s_logate_gateg_db;
+}
+s_slider13 = tmp115;
+s_spl0 = ((((s_inlowestS0 * s_logate_gateg) + (s_inlomidS0 * s_lomidgate_gateg)) + (s_inhimidS0 * s_himidgate_gateg)) + (s_inhighS0 * s_higate_gateg));
+s_spl1 = s_spl0;
+tmp116 = s_spl1;
+} else {
+tmp116 = 0;
+}
+
+out1 = s_spl0;
+out2 = s_spl1;
+frame++;
+if (frame >= vectorsize()) frame = 0;

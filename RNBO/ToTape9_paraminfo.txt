@@ -1,0 +1,69 @@
+ToTape9 — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/totape9/
+
+What it is: the most intense Airwindows tape emulation. Rather than
+wows-and-flutters bolted onto saturation, it models the transport:
+head bump (low-frequency "carrying" of the tape), continous tape
+"shape" (a dull-then-open HF character), real flutter (sample-level pitch
+modulation with an adjustable depth and speed), and custom tape bias
+(under-bias darkens the tape, over-bias distorts it). This RNBO port uses
+the original normalized 0..1 values.
+
+Parameters:
+
+- p_input (Input) 0..1, default 0.5
+  Drive into the tape. Internally gain = (2p)^2, so 0.5 = unity, 0.0 =
+  roughly -12 dB... 1.0 = x4 (+12 dB). A steep quadratic taper: most of
+  the "drive" feel lives in the top half of the knob.
+
+- p_tilt (Tilt) 0..1, default 0.5
+  A single tilt EQ: internally dublyAmount = p*2 (up to +2 treble lift) and
+  outlyAmount = -(1-p)*2 (down to -1 bass cut, hard clamped). 0.5 is flat;
+  right of center tilts up (treble emphasis, "thinner but brighter"), left
+  of center tilts down toward a dark/duller tape. Roughly +/- 12 dB of
+  tilt at the extremes.
+
+- p_shape (Shape) 0..1, default 0.5
+  Sets the internal two-way iirEncFreq/iirDecFreq lowpass pair: it is where
+  the tape's "dark" onset starts. Low Shape = deeply dark tape; high Shape
+  = bright. Roughly a corner-frequency control from very dark to nearly
+  full-band.
+
+- p_flutter (Flutter) 0..1, default 0.5
+  Tape flutter (pitch wobble) depth. Internally flutDepth = p^6 (steep):
+  small settings are subtle wow, huge settings are broken-tape chaos
+  (capped at a 498-sample pitch delay, about 11 ms at 44.1 kHz - that is
+  like a broken car cassette). Musically, keep it under 0.3 for realism.
+
+- p_flutspd (FlutSpd) 0..1, default 0.5
+  Flutter rate. Internally 0.02 * p^3 per sample, a cubic taper: from a
+  slow-consuming tape winding (very slow, drifts like a real man) up to a
+  few Hz cyclic wow. Combined with Flutter depth you dial the "bendiness".
+
+- p_bias (Bias) 0..1, default 0.5
+  Real tape bias. 0.5 is calibrated; below the midpoint is UNDER-bias:
+  the sound gets darker, muffled, slightly compressed. Above the midpoint
+  is OVER-bias: brighter, more distortion, eventually aggressive and
+  "dirty". (Internally bias = 2p - 1, then split into underBias /
+  overBias terms.)
+
+- p_headbmp (HeadBmp) 0..1, default 0.5
+  Bass emphasis of the transport (head bump amount). At modest values it
+  adds warmth/body around the low mids in a way EQ can't (it interacts
+  with flutter phase), and at high values it can become a bumpy or
+  "too round" character - controlled by headfrq next.
+
+- p_headfrq (HeadFrq) 0..1, default 0.5
+  Tuning of the head bump region. Together with HeadBmp it moves the bump
+  along the low-mid / upper-bass spectrum so you can make it sit around
+  kick fundamentals, subbass, or intelligibility of bass guitar.
+
+- p_output (Output) 0..1, default 0.5
+  Output trim. Internally outputGain = p*2, so 0.5 = unity and 1.0 = x2
+  (+6 dB) - the module also outputs a slightly hotter signal by design
+  (a "louder tape" by design that clips a little at the edges).
+
+Musical notes: a"butter" 2-buss tape. Typical master settings: Tilt 0.55,
+Shape 0.65, Flutter 0.1, FlutSpd 0.2, Bias as taste, HeadBmp 0.4-0.5 and
+Output 0.5. Push Input for a "hot master" and then use Output to stop
+pumping (as with all Airwindows tools, range is relative - listen).

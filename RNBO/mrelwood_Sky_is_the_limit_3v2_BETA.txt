@@ -1,0 +1,2598 @@
+/* mrelwood_Sky_is_the_limit_3v2_BETA — RNBO codebox~ port of mrelwood source.
+ * Stereo in1/in2 -> out1/out2; original slider units and defaults.
+ * Graphics and GUI meters omitted. See RNBO/README.md and VALIDATION.md.
+ * desc: Sky is the Limit 3.2 BETA [mrelwood]
+ * 
+ * 
+ * 
+ */
+// Mid/Side
+@param({ min: 0, max: 1 }) slider1 = .2;
+// Link L/R, M/S
+@param({ min: 0, max: 1 }) slider2 = .2;
+// Tilt EQ (dB)
+@param({ min: -6, max: 6 }) slider5 = 0;
+// Pre Compression Punch
+@param({ min: 0, max: 1 }) slider6 = 0;
+// Pre Saturation
+@param({ min: 0, max: 1 }) slider7 = 0;
+// Limiter (Boost dB)
+@param({ min: 0, max: 30 }) slider10 = 0;
+// Safe vs Soft Clip
+@param({ min: 0, max: 1 }) slider11 = .2;
+// -Look ahead (~5 ms)
+@param({ min: 0, max: 1 }) slider51 = 0;
+// -Pre comp
+@param({ min: 0, max: 1 }) slider53 = 0;
+// Ceiling (dB)
+@param({ min: -18, max: 0 }) slider60 = -.1;
+// -Link Threshold & Volume
+@param({ min: 0, max: 1 }) slider62 = 0;
+@state ram = new FixedFloat64Array(1536);
+@state s_initialized = 0;
+@state frame: Int = 0;
+@state prepared = 0;
+@state s___safesoft = 0;
+@state s___safesoft1 = 0;
+@state s___safesoftdb = 0;
+@state s_ac = 0;
+@state s_bufsz = 0;
+@state s_cb0a0 = 0;
+@state s_ceiling = 0;
+@state s_comp1 = 0;
+@state s_compL_dirc = 0;
+@state s_compL_g = 0;
+@state s_compL_gdb = 0;
+@state s_compL_gv = 0;
+@state s_compL_ina = 0;
+@state s_compL_out = 0;
+@state s_compL_ovr = 0;
+@state s_compL_pk = 0;
+@state s_compL_pkdb = 0;
+@state s_compL_pkdir = 0;
+@state s_compL_pkdirf = 0;
+@state s_compL_pkdirfin = 0;
+@state s_compL_pko = 0;
+@state s_compL_prc = 0;
+@state s_compL_rc = 0;
+@state s_compL_tgtdb = 0;
+@state s_compM_dirc = 0;
+@state s_compM_gdb = 0;
+@state s_compM_gv = 0;
+@state s_compM_ina = 0;
+@state s_compM_out = 0;
+@state s_compM_ovr = 0;
+@state s_compM_pk = 0;
+@state s_compM_pkdb = 0;
+@state s_compM_pkdir = 0;
+@state s_compM_pkdirf = 0;
+@state s_compM_pkdirfin = 0;
+@state s_compM_pko = 0;
+@state s_compM_prc = 0;
+@state s_compM_rc = 0;
+@state s_compM_tgtdb = 0;
+@state s_compR_dirc = 0;
+@state s_compR_g = 0;
+@state s_compR_gdb = 0;
+@state s_compR_gv = 0;
+@state s_compR_ina = 0;
+@state s_compR_out = 0;
+@state s_compR_ovr = 0;
+@state s_compR_pk = 0;
+@state s_compR_pkdb = 0;
+@state s_compR_pkdir = 0;
+@state s_compR_pkdirf = 0;
+@state s_compR_pkdirfin = 0;
+@state s_compR_pko = 0;
+@state s_compR_prc = 0;
+@state s_compR_rc = 0;
+@state s_compR_tgtdb = 0;
+@state s_compS_dirc = 0;
+@state s_compS_gdb = 0;
+@state s_compS_gv = 0;
+@state s_compS_ina = 0;
+@state s_compS_out = 0;
+@state s_compS_ovr = 0;
+@state s_compS_pk = 0;
+@state s_compS_pkdb = 0;
+@state s_compS_pkdir = 0;
+@state s_compS_pkdirf = 0;
+@state s_compS_pkdirfin = 0;
+@state s_compS_pko = 0;
+@state s_compS_prc = 0;
+@state s_compS_rc = 0;
+@state s_compS_tgtdb = 0;
+@state s_compgLR = 0;
+@state s_compgMS = 0;
+@state s_compran = 0;
+@state s_comprandb = 0;
+@state s_compthr = 0;
+@state s_compthrdb = 0;
+@state s_compvol = 0;
+@state s_drawall = 0;
+@state s_g = 0;
+@state s_gminLR = 0;
+@state s_gminMS = 0;
+@state s_holdms = 0;
+@state s_hsf_L_in1 = 0;
+@state s_hsf_L_in2 = 0;
+@state s_hsf_L_out = 0;
+@state s_hsf_L_out1 = 0;
+@state s_hsf_L_out2 = 0;
+@state s_hsf_R_in1 = 0;
+@state s_hsf_R_in2 = 0;
+@state s_hsf_R_out = 0;
+@state s_hsf_R_out1 = 0;
+@state s_hsf_R_out2 = 0;
+@state s_hsf__wid = 0;
+@state s_hsf_a0 = 0;
+@state s_hsf_a1 = 0;
+@state s_hsf_a1a0 = 0;
+@state s_hsf_a2 = 0;
+@state s_hsf_a2a0 = 0;
+@state s_hsf_alpha = 0;
+@state s_hsf_b0 = 0;
+@state s_hsf_b0a0 = 0;
+@state s_hsf_b1 = 0;
+@state s_hsf_b1a0 = 0;
+@state s_hsf_b2 = 0;
+@state s_hsf_b2a0 = 0;
+@state s_hsf_beta = 0;
+@state s_hsf_cQ = 0;
+@state s_hsf_ca0 = 0;
+@state s_hsf_ca1 = 0;
+@state s_hsf_ca1a0 = 0;
+@state s_hsf_ca2 = 0;
+@state s_hsf_ca2a0 = 0;
+@state s_hsf_cb0 = 0;
+@state s_hsf_cb1 = 0;
+@state s_hsf_cb1a0 = 0;
+@state s_hsf_cb2 = 0;
+@state s_hsf_cb2a0 = 0;
+@state s_hsf_cosf = 0;
+@state s_hsf_gexp = 0;
+@state s_hsf_gmax = 0;
+@state s_hsf_gmul = 0;
+@state s_hsf_omega = 0;
+@state s_hsf_sinf = 0;
+@state s_hsf_w1 = 0;
+@state s_left = 0;
+@state s_lim2L_buf = 0;
+@state s_lim2L_cc = 0;
+@state s_lim2L_cin = 0;
+@state s_lim2L_cindir = 0;
+@state s_lim2L_cindirflt = 0;
+@state s_lim2L_cino = 0;
+@state s_lim2L_gb = 0;
+@state s_lim2L_ina = 0;
+@state s_lim2L_ing = 0;
+@state s_lim2L_ingc = 0;
+@state s_lim2L_out = 0;
+@state s_lim2L_outg = 0;
+@state s_lim2L_outgdir = 0;
+@state s_lim2L_outgo = 0;
+@state s_lim2L_ovr = 0;
+@state s_lim2L_tgt = 0;
+@state s_lim2L_thr = 0;
+@state s_lim2R_buf = 0;
+@state s_lim2R_cc = 0;
+@state s_lim2R_cin = 0;
+@state s_lim2R_cindir = 0;
+@state s_lim2R_cindirflt = 0;
+@state s_lim2R_cino = 0;
+@state s_lim2R_gb = 0;
+@state s_lim2R_ina = 0;
+@state s_lim2R_ing = 0;
+@state s_lim2R_ingc = 0;
+@state s_lim2R_out = 0;
+@state s_lim2R_outg = 0;
+@state s_lim2R_outgdir = 0;
+@state s_lim2R_outgo = 0;
+@state s_lim2R_ovr = 0;
+@state s_lim2R_tgt = 0;
+@state s_lim2R_thr = 0;
+@state s_limL_buf = 0;
+@state s_limL_cc = 0;
+@state s_limL_cin = 0;
+@state s_limL_cindir = 0;
+@state s_limL_cindirflt = 0;
+@state s_limL_cino = 0;
+@state s_limL_g = 0;
+@state s_limL_gb = 0;
+@state s_limL_ina = 0;
+@state s_limL_ing = 0;
+@state s_limL_ingc = 0;
+@state s_limL_n = 0;
+@state s_limL_out = 0;
+@state s_limL_outa = 0;
+@state s_limL_outao = 0;
+@state s_limL_outg = 0;
+@state s_limL_outgdir = 0;
+@state s_limL_outgo = 0;
+@state s_limL_ovr = 0;
+@state s_limL_pk = 0;
+@state s_limL_pkstart = 0;
+@state s_limL_pos2 = 0;
+@state s_limL_postart = 0;
+@state s_limL_rc = 0;
+@state s_limL_rel = 0;
+@state s_limL_stg = 0;
+@state s_limL_stgo = 0;
+@state s_limL_tgt = 0;
+@state s_limL_thr = 0;
+@state s_limL_top = 0;
+@state s_limL_topo = 0;
+@state s_limL_toppos = 0;
+@state s_limL_toppos2 = 0;
+@state s_limL_totop = 0;
+@state s_limM_buf = 0;
+@state s_limM_cc = 0;
+@state s_limM_cin = 0;
+@state s_limM_cindir = 0;
+@state s_limM_cindirflt = 0;
+@state s_limM_cino = 0;
+@state s_limM_g = 0;
+@state s_limM_gb = 0;
+@state s_limM_ina = 0;
+@state s_limM_ing = 0;
+@state s_limM_ingc = 0;
+@state s_limM_n = 0;
+@state s_limM_out = 0;
+@state s_limM_outa = 0;
+@state s_limM_outao = 0;
+@state s_limM_outg = 0;
+@state s_limM_outgdir = 0;
+@state s_limM_outgo = 0;
+@state s_limM_ovr = 0;
+@state s_limM_pk = 0;
+@state s_limM_pkstart = 0;
+@state s_limM_pos2 = 0;
+@state s_limM_postart = 0;
+@state s_limM_rc = 0;
+@state s_limM_rel = 0;
+@state s_limM_stg = 0;
+@state s_limM_stgo = 0;
+@state s_limM_tgt = 0;
+@state s_limM_thr = 0;
+@state s_limM_top = 0;
+@state s_limM_topo = 0;
+@state s_limM_toppos = 0;
+@state s_limM_toppos2 = 0;
+@state s_limM_totop = 0;
+@state s_limR_buf = 0;
+@state s_limR_cc = 0;
+@state s_limR_cin = 0;
+@state s_limR_cindir = 0;
+@state s_limR_cindirflt = 0;
+@state s_limR_cino = 0;
+@state s_limR_g = 0;
+@state s_limR_gb = 0;
+@state s_limR_ina = 0;
+@state s_limR_ing = 0;
+@state s_limR_ingc = 0;
+@state s_limR_n = 0;
+@state s_limR_out = 0;
+@state s_limR_outa = 0;
+@state s_limR_outao = 0;
+@state s_limR_outg = 0;
+@state s_limR_outgdir = 0;
+@state s_limR_outgo = 0;
+@state s_limR_ovr = 0;
+@state s_limR_pk = 0;
+@state s_limR_pkstart = 0;
+@state s_limR_pos2 = 0;
+@state s_limR_postart = 0;
+@state s_limR_rc = 0;
+@state s_limR_rel = 0;
+@state s_limR_stg = 0;
+@state s_limR_stgo = 0;
+@state s_limR_tgt = 0;
+@state s_limR_thr = 0;
+@state s_limR_top = 0;
+@state s_limR_topo = 0;
+@state s_limR_toppos = 0;
+@state s_limR_toppos2 = 0;
+@state s_limR_totop = 0;
+@state s_limS_buf = 0;
+@state s_limS_cc = 0;
+@state s_limS_cin = 0;
+@state s_limS_cindir = 0;
+@state s_limS_cindirflt = 0;
+@state s_limS_cino = 0;
+@state s_limS_g = 0;
+@state s_limS_gb = 0;
+@state s_limS_ina = 0;
+@state s_limS_ing = 0;
+@state s_limS_ingc = 0;
+@state s_limS_n = 0;
+@state s_limS_out = 0;
+@state s_limS_outa = 0;
+@state s_limS_outao = 0;
+@state s_limS_outg = 0;
+@state s_limS_outgdir = 0;
+@state s_limS_outgo = 0;
+@state s_limS_ovr = 0;
+@state s_limS_pk = 0;
+@state s_limS_pkstart = 0;
+@state s_limS_pos2 = 0;
+@state s_limS_postart = 0;
+@state s_limS_rc = 0;
+@state s_limS_rel = 0;
+@state s_limS_stg = 0;
+@state s_limS_stgo = 0;
+@state s_limS_tgt = 0;
+@state s_limS_thr = 0;
+@state s_limS_top = 0;
+@state s_limS_topo = 0;
+@state s_limS_toppos = 0;
+@state s_limS_toppos2 = 0;
+@state s_limS_totop = 0;
+@state s_liminL = 0;
+@state s_liminM = 0;
+@state s_liminR = 0;
+@state s_liminS = 0;
+@state s_link = 0;
+@state s_look = 0;
+@state s_lsf_L_in1 = 0;
+@state s_lsf_L_in2 = 0;
+@state s_lsf_L_out = 0;
+@state s_lsf_L_out1 = 0;
+@state s_lsf_L_out2 = 0;
+@state s_lsf_R_in1 = 0;
+@state s_lsf_R_in2 = 0;
+@state s_lsf_R_out = 0;
+@state s_lsf_R_out1 = 0;
+@state s_lsf_R_out2 = 0;
+@state s_lsf__wid = 0;
+@state s_lsf_a0 = 0;
+@state s_lsf_a1 = 0;
+@state s_lsf_a1a0 = 0;
+@state s_lsf_a2 = 0;
+@state s_lsf_a2a0 = 0;
+@state s_lsf_alpha = 0;
+@state s_lsf_b0 = 0;
+@state s_lsf_b0a0 = 0;
+@state s_lsf_b1 = 0;
+@state s_lsf_b1a0 = 0;
+@state s_lsf_b2 = 0;
+@state s_lsf_b2a0 = 0;
+@state s_lsf_beta = 0;
+@state s_lsf_cQ = 0;
+@state s_lsf_ca0 = 0;
+@state s_lsf_ca1 = 0;
+@state s_lsf_ca1a0 = 0;
+@state s_lsf_ca2 = 0;
+@state s_lsf_ca2a0 = 0;
+@state s_lsf_cb0 = 0;
+@state s_lsf_cb1 = 0;
+@state s_lsf_cb1a0 = 0;
+@state s_lsf_cb2 = 0;
+@state s_lsf_cb2a0 = 0;
+@state s_lsf_cosf = 0;
+@state s_lsf_gexp = 0;
+@state s_lsf_gmax = 0;
+@state s_lsf_gmul = 0;
+@state s_lsf_omega = 0;
+@state s_lsf_sinf = 0;
+@state s_lsf_w1 = 0;
+@state s_mid = 0;
+@state s_ms = 0;
+@state s_outdir = 0;
+@state s_pdc_bot_ch = 0;
+@state s_pdc_delay = 0;
+@state s_pdc_top_ch = 0;
+@state s_pkdbg = 0;
+@state s_pos = 0;
+@state s_pre = 0;
+@state s_right = 0;
+@state s_safe = 0;
+@state s_safe0 = 0;
+@state s_safe1 = 0;
+@state s_safedb = 0;
+@state s_sat = 0;
+@state s_satL_cin = 0;
+@state s_satL_mix = 0;
+@state s_satL_out = 0;
+@state s_satM_cin = 0;
+@state s_satM_mix = 0;
+@state s_satM_out = 0;
+@state s_satR_cin = 0;
+@state s_satR_mix = 0;
+@state s_satR_out = 0;
+@state s_satS_cin = 0;
+@state s_satS_mix = 0;
+@state s_satS_out = 0;
+@state s_satvol = 0;
+@state s_side = 0;
+@state s_sideg = 0;
+@state s_soft = 0;
+@state s_soft1 = 0;
+@state s_softL_g = 0;
+@state s_softL_g2 = 0;
+@state s_softL_g2o = 0;
+@state s_softL_gb = 0;
+@state s_softL_gdir = 0;
+@state s_softL_go = 0;
+@state s_softL_ina = 0;
+@state s_softL_inab = 0;
+@state s_softL_mix = 0;
+@state s_softL_outg = 0;
+@state s_softL_ovr = 0;
+@state s_softL_tgt = 0;
+@state s_softL_thr = 0;
+@state s_softR_g = 0;
+@state s_softR_g2 = 0;
+@state s_softR_g2o = 0;
+@state s_softR_gb = 0;
+@state s_softR_gdir = 0;
+@state s_softR_go = 0;
+@state s_softR_ina = 0;
+@state s_softR_inab = 0;
+@state s_softR_mix = 0;
+@state s_softR_outg = 0;
+@state s_softR_ovr = 0;
+@state s_softR_tgt = 0;
+@state s_softR_thr = 0;
+@state s_softdb = 0;
+@state s_spl0 = 0;
+@state s_spl1 = 0;
+@state s_srateo = 0;
+@state s_tlt_gain = 0;
+@state s_upall = 0;
+@state s_ver = 0;
+@state s_zero = 0;
+// EEL division by zero returns zero; RNBO arithmetic does not.
+function eelDivide(a,b) { return b == 0 ? 0 : a/b; }
+function fn__upsli() {
+s_ms = pow(slider1,2);
+s_tlt_gain = slider5;
+s_comp1 = pow(slider6,2);
+s_compthrdb = ((0 - 36) * pow(s_comp1,.5));
+s_compthr = pow(2,eelDivide(s_compthrdb,6));
+s_comprandb = (9 * pow(s_comp1,.2));
+s_compran = (pow(2,eelDivide(s_comprandb,6)) - 1);
+s_sat = pow(slider7,2);
+let tmp1 = 1;
+let tmp2 = (slider7 * 2);
+s_zero = (1 - (pow(minimum(tmp1, tmp2),.8) * .15));
+s_satvol = pow(2,eelDivide(((0 - 6) * s_sat),6));
+s_safe0 = (1 - slider11);
+s_safe1 = ((s_safe0 + pow(s_safe0,.25)) * .5);
+s_soft1 = pow((1 - s_safe1),1);
+s_softdb = (s_soft1 * slider10);
+s_soft = pow(2,eelDivide(s_softdb,6));
+s_safe1 += (pow(((pow((1 - s_safe1),eelDivide(1,3)) * pow(s_safe1,3)) * 4),3) * .013);
+s_safedb = (s_safe1 * slider10);
+s_safe = pow(2,eelDivide(s_safedb,6));
+s___safesoft = (s_safe + s_soft);
+s___safesoftdb = (s_safedb + s_softdb);
+s___safesoft1 = (s_safe1 + s_soft1);
+s_compvol = pow(2,eelDivide((eelDivide((pow(s_comp1,1.2) * 12),(1 + s_sat)) * (1 - (pow(eelDivide(slider10,24),1.5) * .7))),6));
+s_link = slider2;
+s_look = slider51;
+let tmp3 = 0;
+if (s_look) {
+s_pdc_delay = (s_bufsz * 2);
+tmp3 = s_pdc_delay;
+} else {
+s_pdc_delay = 0;
+tmp3 = s_pdc_delay;
+}
+s_ceiling = pow(2,eelDivide(slider60,6));
+let tmp66 = 0;
+if (s_tlt_gain > 0) {
+let tmp4 = 4;
+let tmp5 = 3000;
+let tmp6 = s_tlt_gain;
+let tmp7 = 2;
+fn_hsf_eqini(tmp4, tmp5, tmp6, tmp7);
+let tmp31 = 1;
+let tmp32 = 1000;
+let tmp33 = ((0 - s_tlt_gain) * .7);
+let tmp34 = 2;
+tmp66 = fn_lsf_eqini(tmp31, tmp32, tmp33, tmp34);
+} else {
+let tmp58 = 4;
+let tmp59 = 2000;
+let tmp60 = (s_tlt_gain * .8);
+let tmp61 = 5;
+fn_hsf_eqini(tmp58, tmp59, tmp60, tmp61);
+let tmp62 = 1;
+let tmp63 = 1000;
+let tmp64 = (0 - s_tlt_gain);
+let tmp65 = 5;
+tmp66 = fn_lsf_eqini(tmp62, tmp63, tmp64, tmp65);
+}
+return tmp66;
+}
+
+function fn_hsf_eqini(arg_shape, arg_f, arg_ga, arg_w) {
+let tmp30 = 0;
+if (((arg_shape == 1) || (arg_shape == 4))) {
+let tmp8 = 30;
+let tmp9 = (0 - 30);
+let tmp10 = arg_ga;
+let tmp11 = maximum(tmp9, tmp10);
+arg_ga = minimum(tmp8, tmp11);
+let tmp12 = arg_w;
+let tmp13 = .01;
+let tmp14 = arg_ga;
+let tmp15 = (.2 + (.05 * (abs(tmp14) - 20)));
+let tmp16 = maximum(tmp13, tmp15);
+arg_w = maximum(tmp12, tmp16);
+s_hsf__wid = arg_w;
+s_hsf_gmax = 30;
+s_hsf_w1 = eelDivide(1,(eelDivide((arg_w - 1),2) + 1));
+s_hsf_gexp = pow(10,eelDivide(arg_ga,40));
+let tmp17 = s_hsf_gexp;
+let tmp18 = (((s_hsf_gexp + eelDivide(1,s_hsf_gexp)) * (eelDivide(1,s_hsf_w1) - 1)) + 2);
+s_hsf_beta = (sqrt(tmp17) * sqrt(tmp18));
+let tmp19 = pow(10,eelDivide(arg_ga,20));
+s_hsf_gmul = sqrt(tmp19);
+let tmp29 = 0;
+if (arg_shape == 1) {
+s_hsf_b0 = (s_hsf_gmul * (((s_hsf_gmul + 1) - ((s_hsf_gmul - 1) * s_hsf_cosf)) + (s_hsf_beta * s_hsf_sinf)));
+s_hsf_b1 = ((2 * s_hsf_gmul) * ((s_hsf_gmul - 1) - ((s_hsf_gmul + 1) * s_hsf_cosf)));
+s_hsf_b2 = (s_hsf_gmul * (((s_hsf_gmul + 1) - ((s_hsf_gmul - 1) * s_hsf_cosf)) - (s_hsf_beta * s_hsf_sinf)));
+s_hsf_a0 = (((s_hsf_gmul + 1) + ((s_hsf_gmul - 1) * s_hsf_cosf)) + (s_hsf_beta * s_hsf_sinf));
+s_hsf_a1 = ((0 - 2) * ((s_hsf_gmul - 1) + ((s_hsf_gmul + 1) * s_hsf_cosf)));
+s_hsf_a2 = (((s_hsf_gmul + 1) + ((s_hsf_gmul - 1) * s_hsf_cosf)) - (s_hsf_beta * s_hsf_sinf));
+let tmp20 = 30;
+let tmp21 = eelDivide((arg_f * .7),(1 + (arg_w * .1)));
+s_hsf_omega = eelDivide(((2 * PI) * maximum(tmp20, tmp21)),samplerate());
+let tmp22 = s_hsf_omega;
+s_hsf_sinf = sin(tmp22);
+let tmp23 = s_hsf_omega;
+s_hsf_cosf = cos(tmp23);
+s_hsf_cQ = eelDivide(.8,(1 + eelDivide(arg_w,6)));
+s_hsf_alpha = eelDivide(s_hsf_sinf,(2 * s_hsf_cQ));
+s_hsf_cb0 = eelDivide((1 - s_hsf_cosf),2);
+s_hsf_cb1 = (1 - s_hsf_cosf);
+s_hsf_cb2 = eelDivide((1 - s_hsf_cosf),2);
+s_hsf_ca0 = (1 + s_hsf_alpha);
+s_hsf_ca1 = ((0 - 2) * s_hsf_cosf);
+s_hsf_ca2 = (1 - s_hsf_alpha);
+tmp29 = s_hsf_ca2;
+} else {
+let tmp28 = 0;
+if (arg_shape == 4) {
+s_hsf_b0 = (s_hsf_gmul * (((s_hsf_gmul + 1) + ((s_hsf_gmul - 1) * s_hsf_cosf)) + (s_hsf_beta * s_hsf_sinf)));
+s_hsf_b1 = (((0 - 2) * s_hsf_gmul) * ((s_hsf_gmul - 1) + ((s_hsf_gmul + 1) * s_hsf_cosf)));
+s_hsf_b2 = (s_hsf_gmul * (((s_hsf_gmul + 1) + ((s_hsf_gmul - 1) * s_hsf_cosf)) - (s_hsf_beta * s_hsf_sinf)));
+s_hsf_a0 = (((s_hsf_gmul + 1) - ((s_hsf_gmul - 1) * s_hsf_cosf)) + (s_hsf_beta * s_hsf_sinf));
+s_hsf_a1 = (2 * ((s_hsf_gmul - 1) - ((s_hsf_gmul + 1) * s_hsf_cosf)));
+s_hsf_a2 = (((s_hsf_gmul + 1) - ((s_hsf_gmul - 1) * s_hsf_cosf)) - (s_hsf_beta * s_hsf_sinf));
+let tmp24 = (arg_f + 3000);
+let tmp25 = ((arg_f * 1.5) * (1 + (arg_w * .1)));
+s_hsf_omega = eelDivide(((2 * PI) * minimum(tmp24, tmp25)),samplerate());
+let tmp26 = s_hsf_omega;
+s_hsf_sinf = sin(tmp26);
+let tmp27 = s_hsf_omega;
+s_hsf_cosf = cos(tmp27);
+s_hsf_cQ = eelDivide(.8,(1 + eelDivide(arg_w,6)));
+s_hsf_alpha = eelDivide(s_hsf_sinf,(2 * s_hsf_cQ));
+s_hsf_cb0 = eelDivide((1 + s_hsf_cosf),2);
+s_hsf_cb1 = (0 - (1 + s_hsf_cosf));
+s_hsf_cb2 = eelDivide((1 + s_hsf_cosf),2);
+s_hsf_ca0 = (1 + s_hsf_alpha);
+s_hsf_ca1 = ((0 - 2) * s_hsf_cosf);
+s_hsf_ca2 = (1 - s_hsf_alpha);
+tmp28 = s_hsf_ca2;
+} else {
+tmp28 = 0;
+}
+tmp29 = tmp28;
+}
+s_hsf_b0a0 = eelDivide(s_hsf_b0,s_hsf_a0);
+s_hsf_b1a0 = eelDivide(s_hsf_b1,s_hsf_a0);
+s_hsf_b2a0 = eelDivide(s_hsf_b2,s_hsf_a0);
+s_hsf_a1a0 = eelDivide(s_hsf_a1,s_hsf_a0);
+s_hsf_a2a0 = eelDivide(s_hsf_a2,s_hsf_a0);
+s_cb0a0 = eelDivide(s_hsf_cb0,s_hsf_ca0);
+s_hsf_cb1a0 = eelDivide(s_hsf_cb1,s_hsf_ca0);
+s_hsf_cb2a0 = eelDivide(s_hsf_cb2,s_hsf_ca0);
+s_hsf_ca1a0 = eelDivide(s_hsf_ca1,s_hsf_ca0);
+s_hsf_ca2a0 = eelDivide(s_hsf_ca2,s_hsf_ca0);
+tmp30 = s_hsf_ca2a0;
+} else {
+tmp30 = 0;
+}
+return tmp30;
+}
+
+function fn_lsf_eqini(arg_shape, arg_f, arg_ga, arg_w) {
+let tmp57 = 0;
+if (((arg_shape == 1) || (arg_shape == 4))) {
+let tmp35 = 30;
+let tmp36 = (0 - 30);
+let tmp37 = arg_ga;
+let tmp38 = maximum(tmp36, tmp37);
+arg_ga = minimum(tmp35, tmp38);
+let tmp39 = arg_w;
+let tmp40 = .01;
+let tmp41 = arg_ga;
+let tmp42 = (.2 + (.05 * (abs(tmp41) - 20)));
+let tmp43 = maximum(tmp40, tmp42);
+arg_w = maximum(tmp39, tmp43);
+s_lsf__wid = arg_w;
+s_lsf_gmax = 30;
+s_lsf_w1 = eelDivide(1,(eelDivide((arg_w - 1),2) + 1));
+s_lsf_gexp = pow(10,eelDivide(arg_ga,40));
+let tmp44 = s_lsf_gexp;
+let tmp45 = (((s_lsf_gexp + eelDivide(1,s_lsf_gexp)) * (eelDivide(1,s_lsf_w1) - 1)) + 2);
+s_lsf_beta = (sqrt(tmp44) * sqrt(tmp45));
+let tmp46 = pow(10,eelDivide(arg_ga,20));
+s_lsf_gmul = sqrt(tmp46);
+let tmp56 = 0;
+if (arg_shape == 1) {
+s_lsf_b0 = (s_lsf_gmul * (((s_lsf_gmul + 1) - ((s_lsf_gmul - 1) * s_lsf_cosf)) + (s_lsf_beta * s_lsf_sinf)));
+s_lsf_b1 = ((2 * s_lsf_gmul) * ((s_lsf_gmul - 1) - ((s_lsf_gmul + 1) * s_lsf_cosf)));
+s_lsf_b2 = (s_lsf_gmul * (((s_lsf_gmul + 1) - ((s_lsf_gmul - 1) * s_lsf_cosf)) - (s_lsf_beta * s_lsf_sinf)));
+s_lsf_a0 = (((s_lsf_gmul + 1) + ((s_lsf_gmul - 1) * s_lsf_cosf)) + (s_lsf_beta * s_lsf_sinf));
+s_lsf_a1 = ((0 - 2) * ((s_lsf_gmul - 1) + ((s_lsf_gmul + 1) * s_lsf_cosf)));
+s_lsf_a2 = (((s_lsf_gmul + 1) + ((s_lsf_gmul - 1) * s_lsf_cosf)) - (s_lsf_beta * s_lsf_sinf));
+let tmp47 = 30;
+let tmp48 = eelDivide((arg_f * .7),(1 + (arg_w * .1)));
+s_lsf_omega = eelDivide(((2 * PI) * maximum(tmp47, tmp48)),samplerate());
+let tmp49 = s_lsf_omega;
+s_lsf_sinf = sin(tmp49);
+let tmp50 = s_lsf_omega;
+s_lsf_cosf = cos(tmp50);
+s_lsf_cQ = eelDivide(.8,(1 + eelDivide(arg_w,6)));
+s_lsf_alpha = eelDivide(s_lsf_sinf,(2 * s_lsf_cQ));
+s_lsf_cb0 = eelDivide((1 - s_lsf_cosf),2);
+s_lsf_cb1 = (1 - s_lsf_cosf);
+s_lsf_cb2 = eelDivide((1 - s_lsf_cosf),2);
+s_lsf_ca0 = (1 + s_lsf_alpha);
+s_lsf_ca1 = ((0 - 2) * s_lsf_cosf);
+s_lsf_ca2 = (1 - s_lsf_alpha);
+tmp56 = s_lsf_ca2;
+} else {
+let tmp55 = 0;
+if (arg_shape == 4) {
+s_lsf_b0 = (s_lsf_gmul * (((s_lsf_gmul + 1) + ((s_lsf_gmul - 1) * s_lsf_cosf)) + (s_lsf_beta * s_lsf_sinf)));
+s_lsf_b1 = (((0 - 2) * s_lsf_gmul) * ((s_lsf_gmul - 1) + ((s_lsf_gmul + 1) * s_lsf_cosf)));
+s_lsf_b2 = (s_lsf_gmul * (((s_lsf_gmul + 1) + ((s_lsf_gmul - 1) * s_lsf_cosf)) - (s_lsf_beta * s_lsf_sinf)));
+s_lsf_a0 = (((s_lsf_gmul + 1) - ((s_lsf_gmul - 1) * s_lsf_cosf)) + (s_lsf_beta * s_lsf_sinf));
+s_lsf_a1 = (2 * ((s_lsf_gmul - 1) - ((s_lsf_gmul + 1) * s_lsf_cosf)));
+s_lsf_a2 = (((s_lsf_gmul + 1) - ((s_lsf_gmul - 1) * s_lsf_cosf)) - (s_lsf_beta * s_lsf_sinf));
+let tmp51 = (arg_f + 3000);
+let tmp52 = ((arg_f * 1.5) * (1 + (arg_w * .1)));
+s_lsf_omega = eelDivide(((2 * PI) * minimum(tmp51, tmp52)),samplerate());
+let tmp53 = s_lsf_omega;
+s_lsf_sinf = sin(tmp53);
+let tmp54 = s_lsf_omega;
+s_lsf_cosf = cos(tmp54);
+s_lsf_cQ = eelDivide(.8,(1 + eelDivide(arg_w,6)));
+s_lsf_alpha = eelDivide(s_lsf_sinf,(2 * s_lsf_cQ));
+s_lsf_cb0 = eelDivide((1 + s_lsf_cosf),2);
+s_lsf_cb1 = (0 - (1 + s_lsf_cosf));
+s_lsf_cb2 = eelDivide((1 + s_lsf_cosf),2);
+s_lsf_ca0 = (1 + s_lsf_alpha);
+s_lsf_ca1 = ((0 - 2) * s_lsf_cosf);
+s_lsf_ca2 = (1 - s_lsf_alpha);
+tmp55 = s_lsf_ca2;
+} else {
+tmp55 = 0;
+}
+tmp56 = tmp55;
+}
+s_lsf_b0a0 = eelDivide(s_lsf_b0,s_lsf_a0);
+s_lsf_b1a0 = eelDivide(s_lsf_b1,s_lsf_a0);
+s_lsf_b2a0 = eelDivide(s_lsf_b2,s_lsf_a0);
+s_lsf_a1a0 = eelDivide(s_lsf_a1,s_lsf_a0);
+s_lsf_a2a0 = eelDivide(s_lsf_a2,s_lsf_a0);
+s_cb0a0 = eelDivide(s_lsf_cb0,s_lsf_ca0);
+s_lsf_cb1a0 = eelDivide(s_lsf_cb1,s_lsf_ca0);
+s_lsf_cb2a0 = eelDivide(s_lsf_cb2,s_lsf_ca0);
+s_lsf_ca1a0 = eelDivide(s_lsf_ca1,s_lsf_ca0);
+s_lsf_ca2a0 = eelDivide(s_lsf_ca2,s_lsf_ca0);
+tmp57 = s_lsf_ca2a0;
+} else {
+tmp57 = 0;
+}
+return tmp57;
+}
+
+function fn__bufsz() {
+let tmp69 = 0;
+if ((samplerate() > 150000)) {
+tmp69 = 32;
+} else {
+let tmp68 = 0;
+if ((samplerate() > 75000)) {
+tmp68 = 64;
+} else {
+let tmp67 = 0;
+if ((samplerate() > 40000)) {
+tmp67 = 128;
+} else {
+tmp67 = 256;
+}
+tmp68 = tmp67;
+}
+tmp69 = tmp68;
+}
+s_bufsz = tmp69;
+s_limL_buf = 0;
+s_limR_buf = s_bufsz;
+s_limM_buf = (s_bufsz * 2);
+s_limS_buf = (s_bufsz * 3);
+s_lim2L_buf = (s_bufsz * 4);
+s_lim2R_buf = (s_bufsz * 5);
+for (let tmp70: Int = 0; tmp70 < (s_bufsz * 6); tmp70++) { let tmp71: Int = trunc(0+tmp70); ram[tmp71] = 0; }
+return 0;
+}
+
+function fn_lsf_L_eq(arg_in) {
+s_lsf_L_out = (((((s_lsf_b0a0 * arg_in) + (s_lsf_b1a0 * s_lsf_L_in1)) + (s_lsf_b2a0 * s_lsf_L_in2)) - (s_lsf_a1a0 * s_lsf_L_out1)) - (s_lsf_a2a0 * s_lsf_L_out2));
+s_lsf_L_in2 = s_lsf_L_in1;
+s_lsf_L_in1 = arg_in;
+s_lsf_L_out2 = s_lsf_L_out1;
+s_lsf_L_out1 = s_lsf_L_out;
+return s_lsf_L_out1;
+}
+
+function fn_lsf_R_eq(arg_in) {
+s_lsf_R_out = (((((s_lsf_b0a0 * arg_in) + (s_lsf_b1a0 * s_lsf_R_in1)) + (s_lsf_b2a0 * s_lsf_R_in2)) - (s_lsf_a1a0 * s_lsf_R_out1)) - (s_lsf_a2a0 * s_lsf_R_out2));
+s_lsf_R_in2 = s_lsf_R_in1;
+s_lsf_R_in1 = arg_in;
+s_lsf_R_out2 = s_lsf_R_out1;
+s_lsf_R_out1 = s_lsf_R_out;
+return s_lsf_R_out1;
+}
+
+function fn_hsf_L_eq(arg_in) {
+s_hsf_L_out = (((((s_hsf_b0a0 * arg_in) + (s_hsf_b1a0 * s_hsf_L_in1)) + (s_hsf_b2a0 * s_hsf_L_in2)) - (s_hsf_a1a0 * s_hsf_L_out1)) - (s_hsf_a2a0 * s_hsf_L_out2));
+s_hsf_L_in2 = s_hsf_L_in1;
+s_hsf_L_in1 = arg_in;
+s_hsf_L_out2 = s_hsf_L_out1;
+s_hsf_L_out1 = s_hsf_L_out;
+return s_hsf_L_out1;
+}
+
+function fn_hsf_R_eq(arg_in) {
+s_hsf_R_out = (((((s_hsf_b0a0 * arg_in) + (s_hsf_b1a0 * s_hsf_R_in1)) + (s_hsf_b2a0 * s_hsf_R_in2)) - (s_hsf_a1a0 * s_hsf_R_out1)) - (s_hsf_a2a0 * s_hsf_R_out2));
+s_hsf_R_in2 = s_hsf_R_in1;
+s_hsf_R_in1 = arg_in;
+s_hsf_R_out2 = s_hsf_R_out1;
+s_hsf_R_out1 = s_hsf_R_out;
+return s_hsf_R_out1;
+}
+
+function fn_compL_comp(arg_in) {
+let tmp80 = arg_in;
+s_compL_ina = abs(tmp80);
+let tmp81 = 0;
+if (s_compL_ina > s_compL_pk) {
+s_compL_pk += ((s_compL_ina - s_compL_pk) * 1);
+s_compL_prc = 0;
+tmp81 = s_compL_prc;
+} else {
+s_compL_pk -= (((s_compL_pk - s_compL_ina) * eelDivide(s_compL_prc,(samplerate() * .4))) * .003);
+s_compL_prc += 1;
+tmp81 = s_compL_prc;
+}
+s_compL_pkdir = (s_compL_pk - s_compL_pko);
+s_compL_pko = s_compL_pk;
+let tmp82 = 0;
+let tmp83 = (s_compL_pkdir - .003);
+s_compL_pkdirfin = maximum(tmp82, tmp83);
+s_compL_pkdirfin = eelDivide(pow(s_compL_pkdirfin,.5),(1 + pow(s_compL_pkdirfin,.5)));
+let tmp84 = 0;
+if (s_compL_pkdirfin > s_compL_pkdirf) {
+s_compL_pkdirf = s_compL_pkdirfin;
+s_compL_dirc = 0;
+tmp84 = s_compL_dirc;
+} else {
+s_compL_dirc += 1;
+s_compL_pkdirf -= (eelDivide(s_compL_dirc,(samplerate() * .1)) * .00006);
+tmp84 = s_compL_pkdirf;
+}
+let tmp85 = s_compL_pk;
+s_compL_pkdb = (log10(maximum(1e-30, tmp85)) * 19.93);
+let tmp87 = 0;
+if (s_compL_pkdb > s_compthrdb) {
+s_compL_ovr = eelDivide((s_compL_pkdb - s_compthrdb),s_comprandb);
+let tmp86 = s_compL_ovr;
+s_compL_tgtdb = (s_compthrdb + (((4 - eelDivide(4,pow(2,(2 * abs(tmp86))))) * .2) * s_comprandb));
+tmp87 = s_compL_tgtdb;
+} else {
+tmp87 = 0;
+}
+s_pkdbg = (s_compL_pkdb + s_compL_gdb);
+let tmp92 = 0;
+if (s_pkdbg > s_compL_tgtdb) {
+let tmp88 = 0;
+let tmp89 = ((s_compL_pkdb - s_compL_tgtdb) + s_compL_gdb);
+s_compL_gdb -= (maximum(tmp88, tmp89) * .0002);
+s_compL_rc = 0;
+tmp92 = s_compL_rc;
+} else {
+let tmp90 = 1;
+let tmp91 = eelDivide(s_compL_rc,(samplerate() * .05));
+s_compL_gdb += ((((0 - s_compL_gdb) * minimum(tmp90, tmp91)) * .001) + (s_compL_pkdirf * .3));
+s_compL_rc += 1;
+tmp92 = s_compL_rc;
+}
+let tmp93 = 1;
+let tmp94 = pow(2,eelDivide(s_compL_gdb,6));
+s_g = minimum(tmp93, tmp94);
+s_compL_gv = (s_g * s_compvol);
+s_compL_out = (arg_in * s_compL_gv);
+return s_compL_out;
+}
+
+function fn_compR_comp(arg_in) {
+let tmp96 = arg_in;
+s_compR_ina = abs(tmp96);
+let tmp97 = 0;
+if (s_compR_ina > s_compR_pk) {
+s_compR_pk += ((s_compR_ina - s_compR_pk) * 1);
+s_compR_prc = 0;
+tmp97 = s_compR_prc;
+} else {
+s_compR_pk -= (((s_compR_pk - s_compR_ina) * eelDivide(s_compR_prc,(samplerate() * .4))) * .003);
+s_compR_prc += 1;
+tmp97 = s_compR_prc;
+}
+s_compR_pkdir = (s_compR_pk - s_compR_pko);
+s_compR_pko = s_compR_pk;
+let tmp98 = 0;
+let tmp99 = (s_compR_pkdir - .003);
+s_compR_pkdirfin = maximum(tmp98, tmp99);
+s_compR_pkdirfin = eelDivide(pow(s_compR_pkdirfin,.5),(1 + pow(s_compR_pkdirfin,.5)));
+let tmp100 = 0;
+if (s_compR_pkdirfin > s_compR_pkdirf) {
+s_compR_pkdirf = s_compR_pkdirfin;
+s_compR_dirc = 0;
+tmp100 = s_compR_dirc;
+} else {
+s_compR_dirc += 1;
+s_compR_pkdirf -= (eelDivide(s_compR_dirc,(samplerate() * .1)) * .00006);
+tmp100 = s_compR_pkdirf;
+}
+let tmp101 = s_compR_pk;
+s_compR_pkdb = (log10(maximum(1e-30, tmp101)) * 19.93);
+let tmp103 = 0;
+if (s_compR_pkdb > s_compthrdb) {
+s_compR_ovr = eelDivide((s_compR_pkdb - s_compthrdb),s_comprandb);
+let tmp102 = s_compR_ovr;
+s_compR_tgtdb = (s_compthrdb + (((4 - eelDivide(4,pow(2,(2 * abs(tmp102))))) * .2) * s_comprandb));
+tmp103 = s_compR_tgtdb;
+} else {
+tmp103 = 0;
+}
+s_pkdbg = (s_compR_pkdb + s_compR_gdb);
+let tmp108 = 0;
+if (s_pkdbg > s_compR_tgtdb) {
+let tmp104 = 0;
+let tmp105 = ((s_compR_pkdb - s_compR_tgtdb) + s_compR_gdb);
+s_compR_gdb -= (maximum(tmp104, tmp105) * .0002);
+s_compR_rc = 0;
+tmp108 = s_compR_rc;
+} else {
+let tmp106 = 1;
+let tmp107 = eelDivide(s_compR_rc,(samplerate() * .05));
+s_compR_gdb += ((((0 - s_compR_gdb) * minimum(tmp106, tmp107)) * .001) + (s_compR_pkdirf * .3));
+s_compR_rc += 1;
+tmp108 = s_compR_rc;
+}
+let tmp109 = 1;
+let tmp110 = pow(2,eelDivide(s_compR_gdb,6));
+s_g = minimum(tmp109, tmp110);
+s_compR_gv = (s_g * s_compvol);
+s_compR_out = (arg_in * s_compR_gv);
+return s_compR_out;
+}
+
+function fn_compM_comp(arg_in) {
+let tmp115 = arg_in;
+s_compM_ina = abs(tmp115);
+let tmp116 = 0;
+if (s_compM_ina > s_compM_pk) {
+s_compM_pk += ((s_compM_ina - s_compM_pk) * 1);
+s_compM_prc = 0;
+tmp116 = s_compM_prc;
+} else {
+s_compM_pk -= (((s_compM_pk - s_compM_ina) * eelDivide(s_compM_prc,(samplerate() * .4))) * .003);
+s_compM_prc += 1;
+tmp116 = s_compM_prc;
+}
+s_compM_pkdir = (s_compM_pk - s_compM_pko);
+s_compM_pko = s_compM_pk;
+let tmp117 = 0;
+let tmp118 = (s_compM_pkdir - .003);
+s_compM_pkdirfin = maximum(tmp117, tmp118);
+s_compM_pkdirfin = eelDivide(pow(s_compM_pkdirfin,.5),(1 + pow(s_compM_pkdirfin,.5)));
+let tmp119 = 0;
+if (s_compM_pkdirfin > s_compM_pkdirf) {
+s_compM_pkdirf = s_compM_pkdirfin;
+s_compM_dirc = 0;
+tmp119 = s_compM_dirc;
+} else {
+s_compM_dirc += 1;
+s_compM_pkdirf -= (eelDivide(s_compM_dirc,(samplerate() * .1)) * .00006);
+tmp119 = s_compM_pkdirf;
+}
+let tmp120 = s_compM_pk;
+s_compM_pkdb = (log10(maximum(1e-30, tmp120)) * 19.93);
+let tmp122 = 0;
+if (s_compM_pkdb > s_compthrdb) {
+s_compM_ovr = eelDivide((s_compM_pkdb - s_compthrdb),s_comprandb);
+let tmp121 = s_compM_ovr;
+s_compM_tgtdb = (s_compthrdb + (((4 - eelDivide(4,pow(2,(2 * abs(tmp121))))) * .2) * s_comprandb));
+tmp122 = s_compM_tgtdb;
+} else {
+tmp122 = 0;
+}
+s_pkdbg = (s_compM_pkdb + s_compM_gdb);
+let tmp127 = 0;
+if (s_pkdbg > s_compM_tgtdb) {
+let tmp123 = 0;
+let tmp124 = ((s_compM_pkdb - s_compM_tgtdb) + s_compM_gdb);
+s_compM_gdb -= (maximum(tmp123, tmp124) * .0002);
+s_compM_rc = 0;
+tmp127 = s_compM_rc;
+} else {
+let tmp125 = 1;
+let tmp126 = eelDivide(s_compM_rc,(samplerate() * .05));
+s_compM_gdb += ((((0 - s_compM_gdb) * minimum(tmp125, tmp126)) * .001) + (s_compM_pkdirf * .3));
+s_compM_rc += 1;
+tmp127 = s_compM_rc;
+}
+let tmp128 = 1;
+let tmp129 = pow(2,eelDivide(s_compM_gdb,6));
+s_g = minimum(tmp128, tmp129);
+s_compM_gv = (s_g * s_compvol);
+s_compM_out = (arg_in * s_compM_gv);
+return s_compM_out;
+}
+
+function fn_compS_comp(arg_in) {
+let tmp131 = arg_in;
+s_compS_ina = abs(tmp131);
+let tmp132 = 0;
+if (s_compS_ina > s_compS_pk) {
+s_compS_pk += ((s_compS_ina - s_compS_pk) * 1);
+s_compS_prc = 0;
+tmp132 = s_compS_prc;
+} else {
+s_compS_pk -= (((s_compS_pk - s_compS_ina) * eelDivide(s_compS_prc,(samplerate() * .4))) * .003);
+s_compS_prc += 1;
+tmp132 = s_compS_prc;
+}
+s_compS_pkdir = (s_compS_pk - s_compS_pko);
+s_compS_pko = s_compS_pk;
+let tmp133 = 0;
+let tmp134 = (s_compS_pkdir - .003);
+s_compS_pkdirfin = maximum(tmp133, tmp134);
+s_compS_pkdirfin = eelDivide(pow(s_compS_pkdirfin,.5),(1 + pow(s_compS_pkdirfin,.5)));
+let tmp135 = 0;
+if (s_compS_pkdirfin > s_compS_pkdirf) {
+s_compS_pkdirf = s_compS_pkdirfin;
+s_compS_dirc = 0;
+tmp135 = s_compS_dirc;
+} else {
+s_compS_dirc += 1;
+s_compS_pkdirf -= (eelDivide(s_compS_dirc,(samplerate() * .1)) * .00006);
+tmp135 = s_compS_pkdirf;
+}
+let tmp136 = s_compS_pk;
+s_compS_pkdb = (log10(maximum(1e-30, tmp136)) * 19.93);
+let tmp138 = 0;
+if (s_compS_pkdb > s_compthrdb) {
+s_compS_ovr = eelDivide((s_compS_pkdb - s_compthrdb),s_comprandb);
+let tmp137 = s_compS_ovr;
+s_compS_tgtdb = (s_compthrdb + (((4 - eelDivide(4,pow(2,(2 * abs(tmp137))))) * .2) * s_comprandb));
+tmp138 = s_compS_tgtdb;
+} else {
+tmp138 = 0;
+}
+s_pkdbg = (s_compS_pkdb + s_compS_gdb);
+let tmp143 = 0;
+if (s_pkdbg > s_compS_tgtdb) {
+let tmp139 = 0;
+let tmp140 = ((s_compS_pkdb - s_compS_tgtdb) + s_compS_gdb);
+s_compS_gdb -= (maximum(tmp139, tmp140) * .0002);
+s_compS_rc = 0;
+tmp143 = s_compS_rc;
+} else {
+let tmp141 = 1;
+let tmp142 = eelDivide(s_compS_rc,(samplerate() * .05));
+s_compS_gdb += ((((0 - s_compS_gdb) * minimum(tmp141, tmp142)) * .001) + (s_compS_pkdirf * .3));
+s_compS_rc += 1;
+tmp143 = s_compS_rc;
+}
+let tmp144 = 1;
+let tmp145 = pow(2,eelDivide(s_compS_gdb,6));
+s_g = minimum(tmp144, tmp145);
+s_compS_gv = (s_g * s_compvol);
+s_compS_out = (arg_in * s_compS_gv);
+return s_compS_out;
+}
+
+function fn_satL_sat(arg_in) {
+let tmp151 = arg_in;
+let tmp152 = arg_in;
+arg_in *= eelDivide(pow(abs(tmp151),s_zero),abs(tmp152));
+s_satL_cin = (arg_in * (1 + (pow(s_sat,2) * 8)));
+let tmp153 = s_satL_cin;
+let tmp154 = arg_in;
+s_satL_out = (((4 - eelDivide(4,pow(2,(2 * abs(tmp153))))) * .2) * sign(tmp154));
+let tmp155 = 1;
+let tmp156 = eelDivide(s_sat,.2);
+s_satL_mix = minimum(tmp155, tmp156);
+s_satL_out = ((s_satL_out * s_satL_mix) + ((1 - s_satL_mix) * arg_in));
+return s_satL_out;
+}
+
+function fn_satR_sat(arg_in) {
+let tmp158 = arg_in;
+let tmp159 = arg_in;
+arg_in *= eelDivide(pow(abs(tmp158),s_zero),abs(tmp159));
+s_satR_cin = (arg_in * (1 + (pow(s_sat,2) * 8)));
+let tmp160 = s_satR_cin;
+let tmp161 = arg_in;
+s_satR_out = (((4 - eelDivide(4,pow(2,(2 * abs(tmp160))))) * .2) * sign(tmp161));
+let tmp162 = 1;
+let tmp163 = eelDivide(s_sat,.2);
+s_satR_mix = minimum(tmp162, tmp163);
+s_satR_out = ((s_satR_out * s_satR_mix) + ((1 - s_satR_mix) * arg_in));
+return s_satR_out;
+}
+
+function fn_satM_sat(arg_in) {
+let tmp166 = arg_in;
+let tmp167 = arg_in;
+arg_in *= eelDivide(pow(abs(tmp166),s_zero),abs(tmp167));
+s_satM_cin = (arg_in * (1 + (pow(s_sat,2) * 8)));
+let tmp168 = s_satM_cin;
+let tmp169 = arg_in;
+s_satM_out = (((4 - eelDivide(4,pow(2,(2 * abs(tmp168))))) * .2) * sign(tmp169));
+let tmp170 = 1;
+let tmp171 = eelDivide(s_sat,.2);
+s_satM_mix = minimum(tmp170, tmp171);
+s_satM_out = ((s_satM_out * s_satM_mix) + ((1 - s_satM_mix) * arg_in));
+return s_satM_out;
+}
+
+function fn_satS_sat(arg_in) {
+let tmp173 = arg_in;
+let tmp174 = arg_in;
+arg_in *= eelDivide(pow(abs(tmp173),s_zero),abs(tmp174));
+s_satS_cin = (arg_in * (1 + (pow(s_sat,2) * 8)));
+let tmp175 = s_satS_cin;
+let tmp176 = arg_in;
+s_satS_out = (((4 - eelDivide(4,pow(2,(2 * abs(tmp175))))) * .2) * sign(tmp176));
+let tmp177 = 1;
+let tmp178 = eelDivide(s_sat,.2);
+s_satS_mix = minimum(tmp177, tmp178);
+s_satS_out = ((s_satS_out * s_satS_mix) + ((1 - s_satS_mix) * arg_in));
+return s_satS_out;
+}
+
+function fn_limL_limlook(arg_in, arg_out, arg_boost) {
+let tmp192 = arg_in;
+s_limL_ina = abs(tmp192);
+let tmp193 = arg_out;
+s_limL_outa = abs(tmp193);
+s_outdir = (s_limL_outa - s_limL_outao);
+let tmp194 = s_limL_top;
+let tmp195 = s_limL_ina;
+s_limL_top = maximum(tmp194, tmp195);
+let tmp196 = 0;
+if (s_limL_top > s_limL_topo) {
+s_limL_toppos = s_pos;
+s_limL_pkstart = s_limL_pk;
+s_limL_totop = (s_limL_top - s_limL_pkstart);
+tmp196 = s_limL_totop;
+} else {
+tmp196 = 0;
+}
+let tmp197 = 0;
+if (s_limL_top > s_limL_pk) {
+s_limL_stg = 1;
+tmp197 = s_limL_stg;
+} else {
+tmp197 = 0;
+}
+let tmp228 = 0;
+if (((s_limL_outa > s_limL_pk) && (s_outdir > 0))) {
+s_limL_stg = 2;
+s_limL_pk = s_limL_outa;
+tmp228 = s_limL_pk;
+} else {
+let tmp198 = 0;
+if (s_limL_stg != 1) {
+s_ac = 0;
+tmp198 = s_ac;
+} else {
+tmp198 = 0;
+}
+let tmp199 = 0;
+if (s_limL_stg != 3) {
+s_limL_rc = 0;
+tmp199 = s_limL_rc;
+} else {
+tmp199 = 0;
+}
+let tmp202 = 0;
+if ((((s_limL_top > s_limL_topo) && (s_limL_top > s_limL_pk)) && (s_limL_stg != 1))) {
+s_limL_stg = 1;
+s_limL_toppos = (s_pos - 1);
+let tmp200 = 0;
+if ((s_limL_toppos == (0 - 1))) {
+s_limL_toppos += s_bufsz;
+tmp200 = s_limL_toppos;
+} else {
+tmp200 = 0;
+}
+tmp202 = tmp200;
+} else {
+let tmp201 = 0;
+if (s_limL_pk >= s_limL_top) {
+s_limL_stg = 3;
+tmp201 = s_limL_stg;
+} else {
+tmp201 = 0;
+}
+tmp202 = tmp201;
+}
+let tmp208 = 0;
+if (s_limL_stg == 1) {
+let tmp203 = 0;
+if (s_limL_stgo != 1) {
+s_limL_pkstart = s_limL_pk;
+s_limL_postart = s_pos;
+tmp203 = s_limL_postart;
+} else {
+tmp203 = 0;
+}
+let tmp204 = 0;
+if (((s_pos == s_limL_toppos) || (s_limL_pk >= s_limL_top))) {
+s_limL_stg = 3;
+tmp204 = s_limL_stg;
+} else {
+tmp204 = 0;
+}
+let tmp205 = 0;
+if (s_pos < s_limL_postart) {
+s_limL_pos2 = (s_pos + s_bufsz);
+tmp205 = s_limL_pos2;
+} else {
+s_limL_pos2 = s_pos;
+tmp205 = s_limL_pos2;
+}
+let tmp206 = 0;
+if (s_limL_toppos < s_limL_postart) {
+s_limL_toppos2 = (s_limL_toppos + s_bufsz);
+tmp206 = s_limL_toppos2;
+} else {
+s_limL_toppos2 = s_limL_toppos;
+tmp206 = s_limL_toppos2;
+}
+let tmp207 = 0;
+if (((s_pos == s_limL_toppos) || (s_pos == s_limL_postart))) {
+s_limL_stg = 3;
+tmp207 = s_limL_stg;
+} else {
+tmp207 = 0;
+}
+s_limL_pk += ((((s_limL_top - s_limL_pkstart) * eelDivide(s_ac,s_bufsz)) * .002) * s_pre);
+s_ac += 1;
+tmp208 = s_ac;
+} else {
+tmp208 = 0;
+}
+let tmp227 = 0;
+if (s_limL_stg == 3) {
+s_limL_topo = 0;
+s_limL_top = s_limL_topo;
+s_limL_toppos = (0 - 2);
+s_limL_n = s_pos;
+for (let tmp209: Int = 0; tmp209 < s_bufsz; tmp209++) {
+let tmp210 = s_limL_top;
+let tmp211: Int = trunc(s_limL_buf+(s_limL_n));
+let tmp212 = ram[tmp211];
+let tmp213 = abs(tmp212);
+s_limL_top = maximum(tmp210, tmp213);
+let tmp214 = 0;
+if (s_limL_top > s_limL_topo) {
+s_limL_toppos = s_limL_n;
+tmp214 = s_limL_toppos;
+} else {
+tmp214 = 0;
+}
+s_limL_n += 1;
+let tmp215 = 0;
+if (s_limL_n >= s_bufsz) {
+s_limL_n = 0;
+tmp215 = s_limL_n;
+} else {
+tmp215 = 0;
+}
+
+}
+
+let tmp226 = 0;
+if (s_limL_top > s_limL_pk) {
+s_limL_stg = 1;
+tmp226 = s_limL_stg;
+} else {
+let tmp216 = 0;
+let tmp217 = (1 - (s_limL_outa * arg_boost));
+s_limL_rel = ((maximum(tmp216, tmp217) * 10) + 1);
+let tmp218 = 0;
+let tmp219 = (s_limL_pk - s_limL_top);
+let tmp220 = maximum(tmp218, tmp219);
+let tmp221 = 0;
+let tmp222 = 1;
+let tmp223 = eelDivide(s_limL_rc,(samplerate() * .002));
+let tmp224 = minimum(tmp222, tmp223);
+let tmp225 = ((((s_limL_pk - s_limL_outa) * .005) * s_limL_rel) * maximum(tmp221, tmp224));
+s_limL_pk -= minimum(tmp220, tmp225);
+s_limL_rc += 1;
+tmp226 = s_limL_rc;
+}
+tmp227 = tmp226;
+} else {
+tmp227 = 0;
+}
+tmp228 = tmp227;
+}
+s_limL_outao = s_limL_outa;
+s_limL_topo = s_limL_top;
+s_limL_stgo = s_limL_stg;
+s_limL_cin = (s_limL_pk * arg_boost);
+s_limL_tgt = (eelDivide(2,(1 + pow((20 + (5 * pow(s_limL_cin,2.5))),((0 - 2) * s_limL_cin)))) - 1);
+let tmp229 = 0;
+if (s_limL_tgt < s_limL_cin) {
+s_limL_g = eelDivide(s_limL_tgt,s_limL_cin);
+tmp229 = s_limL_g;
+} else {
+s_limL_g = 1;
+tmp229 = s_limL_g;
+}
+s_limL_gb = (s_limL_g * arg_boost);
+return (arg_out * s_limL_gb);
+}
+
+function fn_limR_limlook(arg_in, arg_out, arg_boost) {
+let tmp234 = arg_in;
+s_limR_ina = abs(tmp234);
+let tmp235 = arg_out;
+s_limR_outa = abs(tmp235);
+s_outdir = (s_limR_outa - s_limR_outao);
+let tmp236 = s_limR_top;
+let tmp237 = s_limR_ina;
+s_limR_top = maximum(tmp236, tmp237);
+let tmp238 = 0;
+if (s_limR_top > s_limR_topo) {
+s_limR_toppos = s_pos;
+s_limR_pkstart = s_limR_pk;
+s_limR_totop = (s_limR_top - s_limR_pkstart);
+tmp238 = s_limR_totop;
+} else {
+tmp238 = 0;
+}
+let tmp239 = 0;
+if (s_limR_top > s_limR_pk) {
+s_limR_stg = 1;
+tmp239 = s_limR_stg;
+} else {
+tmp239 = 0;
+}
+let tmp270 = 0;
+if (((s_limR_outa > s_limR_pk) && (s_outdir > 0))) {
+s_limR_stg = 2;
+s_limR_pk = s_limR_outa;
+tmp270 = s_limR_pk;
+} else {
+let tmp240 = 0;
+if (s_limR_stg != 1) {
+s_ac = 0;
+tmp240 = s_ac;
+} else {
+tmp240 = 0;
+}
+let tmp241 = 0;
+if (s_limR_stg != 3) {
+s_limR_rc = 0;
+tmp241 = s_limR_rc;
+} else {
+tmp241 = 0;
+}
+let tmp244 = 0;
+if ((((s_limR_top > s_limR_topo) && (s_limR_top > s_limR_pk)) && (s_limR_stg != 1))) {
+s_limR_stg = 1;
+s_limR_toppos = (s_pos - 1);
+let tmp242 = 0;
+if ((s_limR_toppos == (0 - 1))) {
+s_limR_toppos += s_bufsz;
+tmp242 = s_limR_toppos;
+} else {
+tmp242 = 0;
+}
+tmp244 = tmp242;
+} else {
+let tmp243 = 0;
+if (s_limR_pk >= s_limR_top) {
+s_limR_stg = 3;
+tmp243 = s_limR_stg;
+} else {
+tmp243 = 0;
+}
+tmp244 = tmp243;
+}
+let tmp250 = 0;
+if (s_limR_stg == 1) {
+let tmp245 = 0;
+if (s_limR_stgo != 1) {
+s_limR_pkstart = s_limR_pk;
+s_limR_postart = s_pos;
+tmp245 = s_limR_postart;
+} else {
+tmp245 = 0;
+}
+let tmp246 = 0;
+if (((s_pos == s_limR_toppos) || (s_limR_pk >= s_limR_top))) {
+s_limR_stg = 3;
+tmp246 = s_limR_stg;
+} else {
+tmp246 = 0;
+}
+let tmp247 = 0;
+if (s_pos < s_limR_postart) {
+s_limR_pos2 = (s_pos + s_bufsz);
+tmp247 = s_limR_pos2;
+} else {
+s_limR_pos2 = s_pos;
+tmp247 = s_limR_pos2;
+}
+let tmp248 = 0;
+if (s_limR_toppos < s_limR_postart) {
+s_limR_toppos2 = (s_limR_toppos + s_bufsz);
+tmp248 = s_limR_toppos2;
+} else {
+s_limR_toppos2 = s_limR_toppos;
+tmp248 = s_limR_toppos2;
+}
+let tmp249 = 0;
+if (((s_pos == s_limR_toppos) || (s_pos == s_limR_postart))) {
+s_limR_stg = 3;
+tmp249 = s_limR_stg;
+} else {
+tmp249 = 0;
+}
+s_limR_pk += ((((s_limR_top - s_limR_pkstart) * eelDivide(s_ac,s_bufsz)) * .002) * s_pre);
+s_ac += 1;
+tmp250 = s_ac;
+} else {
+tmp250 = 0;
+}
+let tmp269 = 0;
+if (s_limR_stg == 3) {
+s_limR_topo = 0;
+s_limR_top = s_limR_topo;
+s_limR_toppos = (0 - 2);
+s_limR_n = s_pos;
+for (let tmp251: Int = 0; tmp251 < s_bufsz; tmp251++) {
+let tmp252 = s_limR_top;
+let tmp253: Int = trunc(s_limR_buf+(s_limR_n));
+let tmp254 = ram[tmp253];
+let tmp255 = abs(tmp254);
+s_limR_top = maximum(tmp252, tmp255);
+let tmp256 = 0;
+if (s_limR_top > s_limR_topo) {
+s_limR_toppos = s_limR_n;
+tmp256 = s_limR_toppos;
+} else {
+tmp256 = 0;
+}
+s_limR_n += 1;
+let tmp257 = 0;
+if (s_limR_n >= s_bufsz) {
+s_limR_n = 0;
+tmp257 = s_limR_n;
+} else {
+tmp257 = 0;
+}
+
+}
+
+let tmp268 = 0;
+if (s_limR_top > s_limR_pk) {
+s_limR_stg = 1;
+tmp268 = s_limR_stg;
+} else {
+let tmp258 = 0;
+let tmp259 = (1 - (s_limR_outa * arg_boost));
+s_limR_rel = ((maximum(tmp258, tmp259) * 10) + 1);
+let tmp260 = 0;
+let tmp261 = (s_limR_pk - s_limR_top);
+let tmp262 = maximum(tmp260, tmp261);
+let tmp263 = 0;
+let tmp264 = 1;
+let tmp265 = eelDivide(s_limR_rc,(samplerate() * .002));
+let tmp266 = minimum(tmp264, tmp265);
+let tmp267 = ((((s_limR_pk - s_limR_outa) * .005) * s_limR_rel) * maximum(tmp263, tmp266));
+s_limR_pk -= minimum(tmp262, tmp267);
+s_limR_rc += 1;
+tmp268 = s_limR_rc;
+}
+tmp269 = tmp268;
+} else {
+tmp269 = 0;
+}
+tmp270 = tmp269;
+}
+s_limR_outao = s_limR_outa;
+s_limR_topo = s_limR_top;
+s_limR_stgo = s_limR_stg;
+s_limR_cin = (s_limR_pk * arg_boost);
+s_limR_tgt = (eelDivide(2,(1 + pow((20 + (5 * pow(s_limR_cin,2.5))),((0 - 2) * s_limR_cin)))) - 1);
+let tmp271 = 0;
+if (s_limR_tgt < s_limR_cin) {
+s_limR_g = eelDivide(s_limR_tgt,s_limR_cin);
+tmp271 = s_limR_g;
+} else {
+s_limR_g = 1;
+tmp271 = s_limR_g;
+}
+s_limR_gb = (s_limR_g * arg_boost);
+return (arg_out * s_limR_gb);
+}
+
+function fn_limM_limlook(arg_in, arg_out, arg_boost) {
+let tmp281 = arg_in;
+s_limM_ina = abs(tmp281);
+let tmp282 = arg_out;
+s_limM_outa = abs(tmp282);
+s_outdir = (s_limM_outa - s_limM_outao);
+let tmp283 = s_limM_top;
+let tmp284 = s_limM_ina;
+s_limM_top = maximum(tmp283, tmp284);
+let tmp285 = 0;
+if (s_limM_top > s_limM_topo) {
+s_limM_toppos = s_pos;
+s_limM_pkstart = s_limM_pk;
+s_limM_totop = (s_limM_top - s_limM_pkstart);
+tmp285 = s_limM_totop;
+} else {
+tmp285 = 0;
+}
+let tmp286 = 0;
+if (s_limM_top > s_limM_pk) {
+s_limM_stg = 1;
+tmp286 = s_limM_stg;
+} else {
+tmp286 = 0;
+}
+let tmp317 = 0;
+if (((s_limM_outa > s_limM_pk) && (s_outdir > 0))) {
+s_limM_stg = 2;
+s_limM_pk = s_limM_outa;
+tmp317 = s_limM_pk;
+} else {
+let tmp287 = 0;
+if (s_limM_stg != 1) {
+s_ac = 0;
+tmp287 = s_ac;
+} else {
+tmp287 = 0;
+}
+let tmp288 = 0;
+if (s_limM_stg != 3) {
+s_limM_rc = 0;
+tmp288 = s_limM_rc;
+} else {
+tmp288 = 0;
+}
+let tmp291 = 0;
+if ((((s_limM_top > s_limM_topo) && (s_limM_top > s_limM_pk)) && (s_limM_stg != 1))) {
+s_limM_stg = 1;
+s_limM_toppos = (s_pos - 1);
+let tmp289 = 0;
+if ((s_limM_toppos == (0 - 1))) {
+s_limM_toppos += s_bufsz;
+tmp289 = s_limM_toppos;
+} else {
+tmp289 = 0;
+}
+tmp291 = tmp289;
+} else {
+let tmp290 = 0;
+if (s_limM_pk >= s_limM_top) {
+s_limM_stg = 3;
+tmp290 = s_limM_stg;
+} else {
+tmp290 = 0;
+}
+tmp291 = tmp290;
+}
+let tmp297 = 0;
+if (s_limM_stg == 1) {
+let tmp292 = 0;
+if (s_limM_stgo != 1) {
+s_limM_pkstart = s_limM_pk;
+s_limM_postart = s_pos;
+tmp292 = s_limM_postart;
+} else {
+tmp292 = 0;
+}
+let tmp293 = 0;
+if (((s_pos == s_limM_toppos) || (s_limM_pk >= s_limM_top))) {
+s_limM_stg = 3;
+tmp293 = s_limM_stg;
+} else {
+tmp293 = 0;
+}
+let tmp294 = 0;
+if (s_pos < s_limM_postart) {
+s_limM_pos2 = (s_pos + s_bufsz);
+tmp294 = s_limM_pos2;
+} else {
+s_limM_pos2 = s_pos;
+tmp294 = s_limM_pos2;
+}
+let tmp295 = 0;
+if (s_limM_toppos < s_limM_postart) {
+s_limM_toppos2 = (s_limM_toppos + s_bufsz);
+tmp295 = s_limM_toppos2;
+} else {
+s_limM_toppos2 = s_limM_toppos;
+tmp295 = s_limM_toppos2;
+}
+let tmp296 = 0;
+if (((s_pos == s_limM_toppos) || (s_pos == s_limM_postart))) {
+s_limM_stg = 3;
+tmp296 = s_limM_stg;
+} else {
+tmp296 = 0;
+}
+s_limM_pk += ((((s_limM_top - s_limM_pkstart) * eelDivide(s_ac,s_bufsz)) * .002) * s_pre);
+s_ac += 1;
+tmp297 = s_ac;
+} else {
+tmp297 = 0;
+}
+let tmp316 = 0;
+if (s_limM_stg == 3) {
+s_limM_topo = 0;
+s_limM_top = s_limM_topo;
+s_limM_toppos = (0 - 2);
+s_limM_n = s_pos;
+for (let tmp298: Int = 0; tmp298 < s_bufsz; tmp298++) {
+let tmp299 = s_limM_top;
+let tmp300: Int = trunc(s_limM_buf+(s_limM_n));
+let tmp301 = ram[tmp300];
+let tmp302 = abs(tmp301);
+s_limM_top = maximum(tmp299, tmp302);
+let tmp303 = 0;
+if (s_limM_top > s_limM_topo) {
+s_limM_toppos = s_limM_n;
+tmp303 = s_limM_toppos;
+} else {
+tmp303 = 0;
+}
+s_limM_n += 1;
+let tmp304 = 0;
+if (s_limM_n >= s_bufsz) {
+s_limM_n = 0;
+tmp304 = s_limM_n;
+} else {
+tmp304 = 0;
+}
+
+}
+
+let tmp315 = 0;
+if (s_limM_top > s_limM_pk) {
+s_limM_stg = 1;
+tmp315 = s_limM_stg;
+} else {
+let tmp305 = 0;
+let tmp306 = (1 - (s_limM_outa * arg_boost));
+s_limM_rel = ((maximum(tmp305, tmp306) * 10) + 1);
+let tmp307 = 0;
+let tmp308 = (s_limM_pk - s_limM_top);
+let tmp309 = maximum(tmp307, tmp308);
+let tmp310 = 0;
+let tmp311 = 1;
+let tmp312 = eelDivide(s_limM_rc,(samplerate() * .002));
+let tmp313 = minimum(tmp311, tmp312);
+let tmp314 = ((((s_limM_pk - s_limM_outa) * .005) * s_limM_rel) * maximum(tmp310, tmp313));
+s_limM_pk -= minimum(tmp309, tmp314);
+s_limM_rc += 1;
+tmp315 = s_limM_rc;
+}
+tmp316 = tmp315;
+} else {
+tmp316 = 0;
+}
+tmp317 = tmp316;
+}
+s_limM_outao = s_limM_outa;
+s_limM_topo = s_limM_top;
+s_limM_stgo = s_limM_stg;
+s_limM_cin = (s_limM_pk * arg_boost);
+s_limM_tgt = (eelDivide(2,(1 + pow((20 + (5 * pow(s_limM_cin,2.5))),((0 - 2) * s_limM_cin)))) - 1);
+let tmp318 = 0;
+if (s_limM_tgt < s_limM_cin) {
+s_limM_g = eelDivide(s_limM_tgt,s_limM_cin);
+tmp318 = s_limM_g;
+} else {
+s_limM_g = 1;
+tmp318 = s_limM_g;
+}
+s_limM_gb = (s_limM_g * arg_boost);
+return (arg_out * s_limM_gb);
+}
+
+function fn_limS_limlook(arg_in, arg_out, arg_boost) {
+let tmp323 = arg_in;
+s_limS_ina = abs(tmp323);
+let tmp324 = arg_out;
+s_limS_outa = abs(tmp324);
+s_outdir = (s_limS_outa - s_limS_outao);
+let tmp325 = s_limS_top;
+let tmp326 = s_limS_ina;
+s_limS_top = maximum(tmp325, tmp326);
+let tmp327 = 0;
+if (s_limS_top > s_limS_topo) {
+s_limS_toppos = s_pos;
+s_limS_pkstart = s_limS_pk;
+s_limS_totop = (s_limS_top - s_limS_pkstart);
+tmp327 = s_limS_totop;
+} else {
+tmp327 = 0;
+}
+let tmp328 = 0;
+if (s_limS_top > s_limS_pk) {
+s_limS_stg = 1;
+tmp328 = s_limS_stg;
+} else {
+tmp328 = 0;
+}
+let tmp359 = 0;
+if (((s_limS_outa > s_limS_pk) && (s_outdir > 0))) {
+s_limS_stg = 2;
+s_limS_pk = s_limS_outa;
+tmp359 = s_limS_pk;
+} else {
+let tmp329 = 0;
+if (s_limS_stg != 1) {
+s_ac = 0;
+tmp329 = s_ac;
+} else {
+tmp329 = 0;
+}
+let tmp330 = 0;
+if (s_limS_stg != 3) {
+s_limS_rc = 0;
+tmp330 = s_limS_rc;
+} else {
+tmp330 = 0;
+}
+let tmp333 = 0;
+if ((((s_limS_top > s_limS_topo) && (s_limS_top > s_limS_pk)) && (s_limS_stg != 1))) {
+s_limS_stg = 1;
+s_limS_toppos = (s_pos - 1);
+let tmp331 = 0;
+if ((s_limS_toppos == (0 - 1))) {
+s_limS_toppos += s_bufsz;
+tmp331 = s_limS_toppos;
+} else {
+tmp331 = 0;
+}
+tmp333 = tmp331;
+} else {
+let tmp332 = 0;
+if (s_limS_pk >= s_limS_top) {
+s_limS_stg = 3;
+tmp332 = s_limS_stg;
+} else {
+tmp332 = 0;
+}
+tmp333 = tmp332;
+}
+let tmp339 = 0;
+if (s_limS_stg == 1) {
+let tmp334 = 0;
+if (s_limS_stgo != 1) {
+s_limS_pkstart = s_limS_pk;
+s_limS_postart = s_pos;
+tmp334 = s_limS_postart;
+} else {
+tmp334 = 0;
+}
+let tmp335 = 0;
+if (((s_pos == s_limS_toppos) || (s_limS_pk >= s_limS_top))) {
+s_limS_stg = 3;
+tmp335 = s_limS_stg;
+} else {
+tmp335 = 0;
+}
+let tmp336 = 0;
+if (s_pos < s_limS_postart) {
+s_limS_pos2 = (s_pos + s_bufsz);
+tmp336 = s_limS_pos2;
+} else {
+s_limS_pos2 = s_pos;
+tmp336 = s_limS_pos2;
+}
+let tmp337 = 0;
+if (s_limS_toppos < s_limS_postart) {
+s_limS_toppos2 = (s_limS_toppos + s_bufsz);
+tmp337 = s_limS_toppos2;
+} else {
+s_limS_toppos2 = s_limS_toppos;
+tmp337 = s_limS_toppos2;
+}
+let tmp338 = 0;
+if (((s_pos == s_limS_toppos) || (s_pos == s_limS_postart))) {
+s_limS_stg = 3;
+tmp338 = s_limS_stg;
+} else {
+tmp338 = 0;
+}
+s_limS_pk += ((((s_limS_top - s_limS_pkstart) * eelDivide(s_ac,s_bufsz)) * .002) * s_pre);
+s_ac += 1;
+tmp339 = s_ac;
+} else {
+tmp339 = 0;
+}
+let tmp358 = 0;
+if (s_limS_stg == 3) {
+s_limS_topo = 0;
+s_limS_top = s_limS_topo;
+s_limS_toppos = (0 - 2);
+s_limS_n = s_pos;
+for (let tmp340: Int = 0; tmp340 < s_bufsz; tmp340++) {
+let tmp341 = s_limS_top;
+let tmp342: Int = trunc(s_limS_buf+(s_limS_n));
+let tmp343 = ram[tmp342];
+let tmp344 = abs(tmp343);
+s_limS_top = maximum(tmp341, tmp344);
+let tmp345 = 0;
+if (s_limS_top > s_limS_topo) {
+s_limS_toppos = s_limS_n;
+tmp345 = s_limS_toppos;
+} else {
+tmp345 = 0;
+}
+s_limS_n += 1;
+let tmp346 = 0;
+if (s_limS_n >= s_bufsz) {
+s_limS_n = 0;
+tmp346 = s_limS_n;
+} else {
+tmp346 = 0;
+}
+
+}
+
+let tmp357 = 0;
+if (s_limS_top > s_limS_pk) {
+s_limS_stg = 1;
+tmp357 = s_limS_stg;
+} else {
+let tmp347 = 0;
+let tmp348 = (1 - (s_limS_outa * arg_boost));
+s_limS_rel = ((maximum(tmp347, tmp348) * 10) + 1);
+let tmp349 = 0;
+let tmp350 = (s_limS_pk - s_limS_top);
+let tmp351 = maximum(tmp349, tmp350);
+let tmp352 = 0;
+let tmp353 = 1;
+let tmp354 = eelDivide(s_limS_rc,(samplerate() * .002));
+let tmp355 = minimum(tmp353, tmp354);
+let tmp356 = ((((s_limS_pk - s_limS_outa) * .005) * s_limS_rel) * maximum(tmp352, tmp355));
+s_limS_pk -= minimum(tmp351, tmp356);
+s_limS_rc += 1;
+tmp357 = s_limS_rc;
+}
+tmp358 = tmp357;
+} else {
+tmp358 = 0;
+}
+tmp359 = tmp358;
+}
+s_limS_outao = s_limS_outa;
+s_limS_topo = s_limS_top;
+s_limS_stgo = s_limS_stg;
+s_limS_cin = (s_limS_pk * arg_boost);
+s_limS_tgt = (eelDivide(2,(1 + pow((20 + (5 * pow(s_limS_cin,2.5))),((0 - 2) * s_limS_cin)))) - 1);
+let tmp360 = 0;
+if (s_limS_tgt < s_limS_cin) {
+s_limS_g = eelDivide(s_limS_tgt,s_limS_cin);
+tmp360 = s_limS_g;
+} else {
+s_limS_g = 1;
+tmp360 = s_limS_g;
+}
+s_limS_gb = (s_limS_g * arg_boost);
+return (arg_out * s_limS_gb);
+}
+
+function fn_limL_limit(arg_in, arg_boost) {
+let tmp368 = arg_in;
+s_limL_ina = abs(tmp368);
+s_limL_cin = s_limL_ina;
+s_limL_cindir = (s_limL_cin - s_limL_cino);
+s_limL_cino = s_limL_cin;
+s_limL_cindir /= (1 + pow(s_limL_cindir,2));
+let tmp369 = 0;
+if (((s_limL_cindir - .3) > s_limL_cindirflt)) {
+s_limL_cindirflt = (s_limL_cindir - .3);
+s_limL_cc = 0;
+tmp369 = s_limL_cc;
+} else {
+s_limL_cc += 1;
+s_limL_cindirflt -= ((s_limL_cindirflt * pow(eelDivide(s_limL_cc,(samplerate() * .1)),2)) * .01);
+tmp369 = s_limL_cindirflt;
+}
+let tmp378 = 0;
+if (s_limL_outg < 1) {
+let tmp370 = 0;
+let tmp371 = (1 - s_limL_outg);
+s_limL_ing -= (((maximum(tmp370, tmp371) * s_limL_ing) * (s_limL_outgdir < 0)) * 1);
+s_limL_ingc = ((0 - eelDivide(s_holdms,1000)) * samplerate());
+tmp378 = s_limL_ingc;
+} else {
+s_limL_ingc += 1;
+let tmp372 = 0;
+let tmp373 = (1 - s_limL_cin);
+let tmp374 = 0;
+let tmp375 = 1;
+let tmp376 = eelDivide(s_limL_ingc,(samplerate() * .015));
+let tmp377 = minimum(tmp375, tmp376);
+s_limL_ing += (((pow((1.1 - s_limL_ing),2) * maximum(tmp372, tmp373)) * pow(maximum(tmp374, tmp377),2)) * (.5 + (s_limL_cindirflt * .5)));
+tmp378 = s_limL_ing;
+}
+let tmp379 = 1;
+let tmp380 = 0;
+let tmp381 = s_limL_ing;
+let tmp382 = maximum(tmp380, tmp381);
+s_limL_ing = minimum(tmp379, tmp382);
+s_limL_cin *= (arg_boost * s_limL_ing);
+s_limL_thr = pow(2,eelDivide((0 - 1),6));
+let tmp387 = 0;
+if (s_limL_cin > s_limL_thr) {
+let tmp383 = 0;
+let tmp384 = (eelDivide(s_limL_cin,s_limL_thr) - 1);
+s_limL_ovr = eelDivide(maximum(tmp383, tmp384),(1 - s_limL_thr));
+s_limL_tgt = (s_limL_thr + (((4 - eelDivide(4,pow(2,(2 * s_limL_ovr)))) * .25) * (1 - s_limL_thr)));
+let tmp385 = 1;
+let tmp386 = eelDivide(s_limL_tgt,s_limL_cin);
+s_limL_outg = minimum(tmp385, tmp386);
+tmp387 = s_limL_outg;
+} else {
+s_limL_outg = 1;
+tmp387 = s_limL_outg;
+}
+s_limL_outgdir = (s_limL_outg - s_limL_outgo);
+s_limL_outgo = s_limL_outg;
+s_limL_gb = ((s_limL_ing * s_limL_outg) * arg_boost);
+s_limL_out = (arg_in * s_limL_gb);
+return s_limL_out;
+}
+
+function fn_limR_limit(arg_in, arg_boost) {
+let tmp390 = arg_in;
+s_limR_ina = abs(tmp390);
+s_limR_cin = s_limR_ina;
+s_limR_cindir = (s_limR_cin - s_limR_cino);
+s_limR_cino = s_limR_cin;
+s_limR_cindir /= (1 + pow(s_limR_cindir,2));
+let tmp391 = 0;
+if (((s_limR_cindir - .3) > s_limR_cindirflt)) {
+s_limR_cindirflt = (s_limR_cindir - .3);
+s_limR_cc = 0;
+tmp391 = s_limR_cc;
+} else {
+s_limR_cc += 1;
+s_limR_cindirflt -= ((s_limR_cindirflt * pow(eelDivide(s_limR_cc,(samplerate() * .1)),2)) * .01);
+tmp391 = s_limR_cindirflt;
+}
+let tmp400 = 0;
+if (s_limR_outg < 1) {
+let tmp392 = 0;
+let tmp393 = (1 - s_limR_outg);
+s_limR_ing -= (((maximum(tmp392, tmp393) * s_limR_ing) * (s_limR_outgdir < 0)) * 1);
+s_limR_ingc = ((0 - eelDivide(s_holdms,1000)) * samplerate());
+tmp400 = s_limR_ingc;
+} else {
+s_limR_ingc += 1;
+let tmp394 = 0;
+let tmp395 = (1 - s_limR_cin);
+let tmp396 = 0;
+let tmp397 = 1;
+let tmp398 = eelDivide(s_limR_ingc,(samplerate() * .015));
+let tmp399 = minimum(tmp397, tmp398);
+s_limR_ing += (((pow((1.1 - s_limR_ing),2) * maximum(tmp394, tmp395)) * pow(maximum(tmp396, tmp399),2)) * (.5 + (s_limR_cindirflt * .5)));
+tmp400 = s_limR_ing;
+}
+let tmp401 = 1;
+let tmp402 = 0;
+let tmp403 = s_limR_ing;
+let tmp404 = maximum(tmp402, tmp403);
+s_limR_ing = minimum(tmp401, tmp404);
+s_limR_cin *= (arg_boost * s_limR_ing);
+s_limR_thr = pow(2,eelDivide((0 - 1),6));
+let tmp409 = 0;
+if (s_limR_cin > s_limR_thr) {
+let tmp405 = 0;
+let tmp406 = (eelDivide(s_limR_cin,s_limR_thr) - 1);
+s_limR_ovr = eelDivide(maximum(tmp405, tmp406),(1 - s_limR_thr));
+s_limR_tgt = (s_limR_thr + (((4 - eelDivide(4,pow(2,(2 * s_limR_ovr)))) * .25) * (1 - s_limR_thr)));
+let tmp407 = 1;
+let tmp408 = eelDivide(s_limR_tgt,s_limR_cin);
+s_limR_outg = minimum(tmp407, tmp408);
+tmp409 = s_limR_outg;
+} else {
+s_limR_outg = 1;
+tmp409 = s_limR_outg;
+}
+s_limR_outgdir = (s_limR_outg - s_limR_outgo);
+s_limR_outgo = s_limR_outg;
+s_limR_gb = ((s_limR_ing * s_limR_outg) * arg_boost);
+s_limR_out = (arg_in * s_limR_gb);
+return s_limR_out;
+}
+
+function fn_limM_limit(arg_in, arg_boost) {
+let tmp415 = arg_in;
+s_limM_ina = abs(tmp415);
+s_limM_cin = s_limM_ina;
+s_limM_cindir = (s_limM_cin - s_limM_cino);
+s_limM_cino = s_limM_cin;
+s_limM_cindir /= (1 + pow(s_limM_cindir,2));
+let tmp416 = 0;
+if (((s_limM_cindir - .3) > s_limM_cindirflt)) {
+s_limM_cindirflt = (s_limM_cindir - .3);
+s_limM_cc = 0;
+tmp416 = s_limM_cc;
+} else {
+s_limM_cc += 1;
+s_limM_cindirflt -= ((s_limM_cindirflt * pow(eelDivide(s_limM_cc,(samplerate() * .1)),2)) * .01);
+tmp416 = s_limM_cindirflt;
+}
+let tmp425 = 0;
+if (s_limM_outg < 1) {
+let tmp417 = 0;
+let tmp418 = (1 - s_limM_outg);
+s_limM_ing -= (((maximum(tmp417, tmp418) * s_limM_ing) * (s_limM_outgdir < 0)) * 1);
+s_limM_ingc = ((0 - eelDivide(s_holdms,1000)) * samplerate());
+tmp425 = s_limM_ingc;
+} else {
+s_limM_ingc += 1;
+let tmp419 = 0;
+let tmp420 = (1 - s_limM_cin);
+let tmp421 = 0;
+let tmp422 = 1;
+let tmp423 = eelDivide(s_limM_ingc,(samplerate() * .015));
+let tmp424 = minimum(tmp422, tmp423);
+s_limM_ing += (((pow((1.1 - s_limM_ing),2) * maximum(tmp419, tmp420)) * pow(maximum(tmp421, tmp424),2)) * (.5 + (s_limM_cindirflt * .5)));
+tmp425 = s_limM_ing;
+}
+let tmp426 = 1;
+let tmp427 = 0;
+let tmp428 = s_limM_ing;
+let tmp429 = maximum(tmp427, tmp428);
+s_limM_ing = minimum(tmp426, tmp429);
+s_limM_cin *= (arg_boost * s_limM_ing);
+s_limM_thr = pow(2,eelDivide((0 - 1),6));
+let tmp434 = 0;
+if (s_limM_cin > s_limM_thr) {
+let tmp430 = 0;
+let tmp431 = (eelDivide(s_limM_cin,s_limM_thr) - 1);
+s_limM_ovr = eelDivide(maximum(tmp430, tmp431),(1 - s_limM_thr));
+s_limM_tgt = (s_limM_thr + (((4 - eelDivide(4,pow(2,(2 * s_limM_ovr)))) * .25) * (1 - s_limM_thr)));
+let tmp432 = 1;
+let tmp433 = eelDivide(s_limM_tgt,s_limM_cin);
+s_limM_outg = minimum(tmp432, tmp433);
+tmp434 = s_limM_outg;
+} else {
+s_limM_outg = 1;
+tmp434 = s_limM_outg;
+}
+s_limM_outgdir = (s_limM_outg - s_limM_outgo);
+s_limM_outgo = s_limM_outg;
+s_limM_gb = ((s_limM_ing * s_limM_outg) * arg_boost);
+s_limM_out = (arg_in * s_limM_gb);
+return s_limM_out;
+}
+
+function fn_limS_limit(arg_in, arg_boost) {
+let tmp437 = arg_in;
+s_limS_ina = abs(tmp437);
+s_limS_cin = s_limS_ina;
+s_limS_cindir = (s_limS_cin - s_limS_cino);
+s_limS_cino = s_limS_cin;
+s_limS_cindir /= (1 + pow(s_limS_cindir,2));
+let tmp438 = 0;
+if (((s_limS_cindir - .3) > s_limS_cindirflt)) {
+s_limS_cindirflt = (s_limS_cindir - .3);
+s_limS_cc = 0;
+tmp438 = s_limS_cc;
+} else {
+s_limS_cc += 1;
+s_limS_cindirflt -= ((s_limS_cindirflt * pow(eelDivide(s_limS_cc,(samplerate() * .1)),2)) * .01);
+tmp438 = s_limS_cindirflt;
+}
+let tmp447 = 0;
+if (s_limS_outg < 1) {
+let tmp439 = 0;
+let tmp440 = (1 - s_limS_outg);
+s_limS_ing -= (((maximum(tmp439, tmp440) * s_limS_ing) * (s_limS_outgdir < 0)) * 1);
+s_limS_ingc = ((0 - eelDivide(s_holdms,1000)) * samplerate());
+tmp447 = s_limS_ingc;
+} else {
+s_limS_ingc += 1;
+let tmp441 = 0;
+let tmp442 = (1 - s_limS_cin);
+let tmp443 = 0;
+let tmp444 = 1;
+let tmp445 = eelDivide(s_limS_ingc,(samplerate() * .015));
+let tmp446 = minimum(tmp444, tmp445);
+s_limS_ing += (((pow((1.1 - s_limS_ing),2) * maximum(tmp441, tmp442)) * pow(maximum(tmp443, tmp446),2)) * (.5 + (s_limS_cindirflt * .5)));
+tmp447 = s_limS_ing;
+}
+let tmp448 = 1;
+let tmp449 = 0;
+let tmp450 = s_limS_ing;
+let tmp451 = maximum(tmp449, tmp450);
+s_limS_ing = minimum(tmp448, tmp451);
+s_limS_cin *= (arg_boost * s_limS_ing);
+s_limS_thr = pow(2,eelDivide((0 - 1),6));
+let tmp456 = 0;
+if (s_limS_cin > s_limS_thr) {
+let tmp452 = 0;
+let tmp453 = (eelDivide(s_limS_cin,s_limS_thr) - 1);
+s_limS_ovr = eelDivide(maximum(tmp452, tmp453),(1 - s_limS_thr));
+s_limS_tgt = (s_limS_thr + (((4 - eelDivide(4,pow(2,(2 * s_limS_ovr)))) * .25) * (1 - s_limS_thr)));
+let tmp454 = 1;
+let tmp455 = eelDivide(s_limS_tgt,s_limS_cin);
+s_limS_outg = minimum(tmp454, tmp455);
+tmp456 = s_limS_outg;
+} else {
+s_limS_outg = 1;
+tmp456 = s_limS_outg;
+}
+s_limS_outgdir = (s_limS_outg - s_limS_outgo);
+s_limS_outgo = s_limS_outg;
+s_limS_gb = ((s_limS_ing * s_limS_outg) * arg_boost);
+s_limS_out = (arg_in * s_limS_gb);
+return s_limS_out;
+}
+
+function fn_lim2L_limit(arg_in, arg_boost) {
+let tmp463 = arg_in;
+s_lim2L_ina = abs(tmp463);
+s_lim2L_cin = s_lim2L_ina;
+s_lim2L_cindir = (s_lim2L_cin - s_lim2L_cino);
+s_lim2L_cino = s_lim2L_cin;
+s_lim2L_cindir /= (1 + pow(s_lim2L_cindir,2));
+let tmp464 = 0;
+if (((s_lim2L_cindir - .3) > s_lim2L_cindirflt)) {
+s_lim2L_cindirflt = (s_lim2L_cindir - .3);
+s_lim2L_cc = 0;
+tmp464 = s_lim2L_cc;
+} else {
+s_lim2L_cc += 1;
+s_lim2L_cindirflt -= ((s_lim2L_cindirflt * pow(eelDivide(s_lim2L_cc,(samplerate() * .1)),2)) * .01);
+tmp464 = s_lim2L_cindirflt;
+}
+let tmp473 = 0;
+if (s_lim2L_outg < 1) {
+let tmp465 = 0;
+let tmp466 = (1 - s_lim2L_outg);
+s_lim2L_ing -= (((maximum(tmp465, tmp466) * s_lim2L_ing) * (s_lim2L_outgdir < 0)) * 1);
+s_lim2L_ingc = ((0 - eelDivide(s_holdms,1000)) * samplerate());
+tmp473 = s_lim2L_ingc;
+} else {
+s_lim2L_ingc += 1;
+let tmp467 = 0;
+let tmp468 = (1 - s_lim2L_cin);
+let tmp469 = 0;
+let tmp470 = 1;
+let tmp471 = eelDivide(s_lim2L_ingc,(samplerate() * .015));
+let tmp472 = minimum(tmp470, tmp471);
+s_lim2L_ing += (((pow((1.1 - s_lim2L_ing),2) * maximum(tmp467, tmp468)) * pow(maximum(tmp469, tmp472),2)) * (.5 + (s_lim2L_cindirflt * .5)));
+tmp473 = s_lim2L_ing;
+}
+let tmp474 = 1;
+let tmp475 = 0;
+let tmp476 = s_lim2L_ing;
+let tmp477 = maximum(tmp475, tmp476);
+s_lim2L_ing = minimum(tmp474, tmp477);
+s_lim2L_cin *= (arg_boost * s_lim2L_ing);
+s_lim2L_thr = pow(2,eelDivide((0 - 1),6));
+let tmp482 = 0;
+if (s_lim2L_cin > s_lim2L_thr) {
+let tmp478 = 0;
+let tmp479 = (eelDivide(s_lim2L_cin,s_lim2L_thr) - 1);
+s_lim2L_ovr = eelDivide(maximum(tmp478, tmp479),(1 - s_lim2L_thr));
+s_lim2L_tgt = (s_lim2L_thr + (((4 - eelDivide(4,pow(2,(2 * s_lim2L_ovr)))) * .25) * (1 - s_lim2L_thr)));
+let tmp480 = 1;
+let tmp481 = eelDivide(s_lim2L_tgt,s_lim2L_cin);
+s_lim2L_outg = minimum(tmp480, tmp481);
+tmp482 = s_lim2L_outg;
+} else {
+s_lim2L_outg = 1;
+tmp482 = s_lim2L_outg;
+}
+s_lim2L_outgdir = (s_lim2L_outg - s_lim2L_outgo);
+s_lim2L_outgo = s_lim2L_outg;
+s_lim2L_gb = ((s_lim2L_ing * s_lim2L_outg) * arg_boost);
+s_lim2L_out = (arg_in * s_lim2L_gb);
+return s_lim2L_out;
+}
+
+function fn_lim2R_limit(arg_in, arg_boost) {
+let tmp485 = arg_in;
+s_lim2R_ina = abs(tmp485);
+s_lim2R_cin = s_lim2R_ina;
+s_lim2R_cindir = (s_lim2R_cin - s_lim2R_cino);
+s_lim2R_cino = s_lim2R_cin;
+s_lim2R_cindir /= (1 + pow(s_lim2R_cindir,2));
+let tmp486 = 0;
+if (((s_lim2R_cindir - .3) > s_lim2R_cindirflt)) {
+s_lim2R_cindirflt = (s_lim2R_cindir - .3);
+s_lim2R_cc = 0;
+tmp486 = s_lim2R_cc;
+} else {
+s_lim2R_cc += 1;
+s_lim2R_cindirflt -= ((s_lim2R_cindirflt * pow(eelDivide(s_lim2R_cc,(samplerate() * .1)),2)) * .01);
+tmp486 = s_lim2R_cindirflt;
+}
+let tmp495 = 0;
+if (s_lim2R_outg < 1) {
+let tmp487 = 0;
+let tmp488 = (1 - s_lim2R_outg);
+s_lim2R_ing -= (((maximum(tmp487, tmp488) * s_lim2R_ing) * (s_lim2R_outgdir < 0)) * 1);
+s_lim2R_ingc = ((0 - eelDivide(s_holdms,1000)) * samplerate());
+tmp495 = s_lim2R_ingc;
+} else {
+s_lim2R_ingc += 1;
+let tmp489 = 0;
+let tmp490 = (1 - s_lim2R_cin);
+let tmp491 = 0;
+let tmp492 = 1;
+let tmp493 = eelDivide(s_lim2R_ingc,(samplerate() * .015));
+let tmp494 = minimum(tmp492, tmp493);
+s_lim2R_ing += (((pow((1.1 - s_lim2R_ing),2) * maximum(tmp489, tmp490)) * pow(maximum(tmp491, tmp494),2)) * (.5 + (s_lim2R_cindirflt * .5)));
+tmp495 = s_lim2R_ing;
+}
+let tmp496 = 1;
+let tmp497 = 0;
+let tmp498 = s_lim2R_ing;
+let tmp499 = maximum(tmp497, tmp498);
+s_lim2R_ing = minimum(tmp496, tmp499);
+s_lim2R_cin *= (arg_boost * s_lim2R_ing);
+s_lim2R_thr = pow(2,eelDivide((0 - 1),6));
+let tmp504 = 0;
+if (s_lim2R_cin > s_lim2R_thr) {
+let tmp500 = 0;
+let tmp501 = (eelDivide(s_lim2R_cin,s_lim2R_thr) - 1);
+s_lim2R_ovr = eelDivide(maximum(tmp500, tmp501),(1 - s_lim2R_thr));
+s_lim2R_tgt = (s_lim2R_thr + (((4 - eelDivide(4,pow(2,(2 * s_lim2R_ovr)))) * .25) * (1 - s_lim2R_thr)));
+let tmp502 = 1;
+let tmp503 = eelDivide(s_lim2R_tgt,s_lim2R_cin);
+s_lim2R_outg = minimum(tmp502, tmp503);
+tmp504 = s_lim2R_outg;
+} else {
+s_lim2R_outg = 1;
+tmp504 = s_lim2R_outg;
+}
+s_lim2R_outgdir = (s_lim2R_outg - s_lim2R_outgo);
+s_lim2R_outgo = s_lim2R_outg;
+s_lim2R_gb = ((s_lim2R_ing * s_lim2R_outg) * arg_boost);
+s_lim2R_out = (arg_in * s_lim2R_gb);
+return s_lim2R_out;
+}
+
+function fn_softL_soft(arg_in, arg_boost) {
+let tmp508 = arg_in;
+s_softL_ina = abs(tmp508);
+s_softL_inab = (s_softL_ina * arg_boost);
+s_softL_thr = pow(2,eelDivide((0 - .5),6));
+let tmp511 = 0;
+if (s_softL_inab > s_softL_thr) {
+let tmp509 = 0;
+let tmp510 = (s_softL_inab - s_softL_thr);
+s_softL_ovr = eelDivide(maximum(tmp509, tmp510),(1 - s_softL_thr));
+s_softL_tgt = (s_softL_thr + ((eelDivide(2,(1 + pow((2.7 + (1.2 * pow(s_softL_ovr,2.5))),((0 - 2) * s_softL_ovr)))) - 1) * (1 - s_softL_thr)));
+s_softL_g = eelDivide(s_softL_tgt,s_softL_inab);
+tmp511 = s_softL_g;
+} else {
+s_softL_tgt = 1;
+s_softL_g = s_softL_tgt;
+tmp511 = s_softL_g;
+}
+let tmp512 = 0;
+let tmp513 = 1;
+let tmp514 = s_softL_g;
+let tmp515 = minimum(tmp513, tmp514);
+s_softL_g = maximum(tmp512, tmp515);
+s_softL_gdir = (s_softL_g - s_softL_go);
+s_softL_go = s_softL_g;
+let tmp520 = 0;
+if (s_softL_gdir < 0) {
+let tmp516 = s_softL_g;
+let tmp517 = (s_softL_g2 + ((s_softL_g - s_softL_g2) * .07));
+s_softL_g2 = minimum(tmp516, tmp517);
+s_softL_g2o = s_softL_g2;
+tmp520 = s_softL_g2o;
+} else {
+let tmp518 = 0;
+let tmp519 = (1 - (s_softL_inab * s_softL_g));
+s_softL_g2 += ((1 - s_softL_g2o) * pow(maximum(tmp518, tmp519),.75));
+tmp520 = s_softL_g2;
+}
+let tmp521 = 0;
+let tmp522 = 1;
+let tmp523 = s_softL_g2;
+let tmp524 = minimum(tmp522, tmp523);
+s_softL_g2 = maximum(tmp521, tmp524);
+s_softL_gb = (s_softL_g2 * arg_boost);
+let tmp525 = 1;
+let tmp526 = eelDivide(s_soft1,.2);
+s_softL_mix = minimum(tmp525, tmp526);
+s_softL_outg = ((s_softL_gb * s_softL_mix) + (1 - s_softL_mix));
+return s_softL_outg;
+}
+
+function fn_softR_soft(arg_in, arg_boost) {
+let tmp529 = arg_in;
+s_softR_ina = abs(tmp529);
+s_softR_inab = (s_softR_ina * arg_boost);
+s_softR_thr = pow(2,eelDivide((0 - .5),6));
+let tmp532 = 0;
+if (s_softR_inab > s_softR_thr) {
+let tmp530 = 0;
+let tmp531 = (s_softR_inab - s_softR_thr);
+s_softR_ovr = eelDivide(maximum(tmp530, tmp531),(1 - s_softR_thr));
+s_softR_tgt = (s_softR_thr + ((eelDivide(2,(1 + pow((2.7 + (1.2 * pow(s_softR_ovr,2.5))),((0 - 2) * s_softR_ovr)))) - 1) * (1 - s_softR_thr)));
+s_softR_g = eelDivide(s_softR_tgt,s_softR_inab);
+tmp532 = s_softR_g;
+} else {
+s_softR_tgt = 1;
+s_softR_g = s_softR_tgt;
+tmp532 = s_softR_g;
+}
+let tmp533 = 0;
+let tmp534 = 1;
+let tmp535 = s_softR_g;
+let tmp536 = minimum(tmp534, tmp535);
+s_softR_g = maximum(tmp533, tmp536);
+s_softR_gdir = (s_softR_g - s_softR_go);
+s_softR_go = s_softR_g;
+let tmp541 = 0;
+if (s_softR_gdir < 0) {
+let tmp537 = s_softR_g;
+let tmp538 = (s_softR_g2 + ((s_softR_g - s_softR_g2) * .07));
+s_softR_g2 = minimum(tmp537, tmp538);
+s_softR_g2o = s_softR_g2;
+tmp541 = s_softR_g2o;
+} else {
+let tmp539 = 0;
+let tmp540 = (1 - (s_softR_inab * s_softR_g));
+s_softR_g2 += ((1 - s_softR_g2o) * pow(maximum(tmp539, tmp540),.75));
+tmp541 = s_softR_g2;
+}
+let tmp542 = 0;
+let tmp543 = 1;
+let tmp544 = s_softR_g2;
+let tmp545 = minimum(tmp543, tmp544);
+s_softR_g2 = maximum(tmp542, tmp545);
+s_softR_gb = (s_softR_g2 * arg_boost);
+let tmp546 = 1;
+let tmp547 = eelDivide(s_soft1,.2);
+s_softR_mix = minimum(tmp546, tmp547);
+s_softR_outg = ((s_softR_gb * s_softR_mix) + (1 - s_softR_mix));
+return s_softR_outg;
+}
+function dspsetup() { frame = 0; prepared = 0; controlsReady = 0; }
+if (prepared == 0) {
+if (prepared == 0 && s_initialized == 0) {
+s_ver = 3.2;
+s_drawall = 1;
+s_upall = s_drawall;
+s_holdms = 13;
+s_pdc_bot_ch = 0;
+s_pdc_top_ch = 2;
+s_compR_g = 1;
+s_compL_g = s_compR_g;
+fn__upsli();
+s_initialized = 1;
+}
+prepared = 1;
+}
+@state previousControls = new FixedFloat64Array(11);
+@state controlsReady = 0;
+if (frame == 0) {
+let changed = controlsReady == 0;
+if (previousControls[0] != slider1) changed = 1;
+previousControls[0] = slider1;
+if (previousControls[1] != slider2) changed = 1;
+previousControls[1] = slider2;
+if (previousControls[2] != slider5) changed = 1;
+previousControls[2] = slider5;
+if (previousControls[3] != slider6) changed = 1;
+previousControls[3] = slider6;
+if (previousControls[4] != slider7) changed = 1;
+previousControls[4] = slider7;
+if (previousControls[5] != slider10) changed = 1;
+previousControls[5] = slider10;
+if (previousControls[6] != slider11) changed = 1;
+previousControls[6] = slider11;
+if (previousControls[7] != slider51) changed = 1;
+previousControls[7] = slider51;
+if (previousControls[8] != slider53) changed = 1;
+previousControls[8] = slider53;
+if (previousControls[9] != slider60) changed = 1;
+previousControls[9] = slider60;
+if (previousControls[10] != slider62) changed = 1;
+previousControls[10] = slider62;
+if (changed) {
+fn__upsli();
+controlsReady = 1;
+}
+let tmp72 = 0;
+if ((samplerate() != s_srateo)) {
+tmp72 = fn__bufsz();
+} else {
+tmp72 = 0;
+}
+s_srateo = samplerate();
+
+}
+s_spl0 = in1;
+s_spl1 = in2;
+s_sideg = 1.5;
+let tmp77 = 0;
+if (s_tlt_gain != 0) {
+let tmp73 = s_spl0;
+s_spl0 = fn_lsf_L_eq(tmp73);
+let tmp74 = s_spl1;
+s_spl1 = fn_lsf_R_eq(tmp74);
+let tmp75 = s_spl0;
+s_spl0 = fn_hsf_L_eq(tmp75);
+let tmp76 = s_spl1;
+s_spl1 = fn_hsf_R_eq(tmp76);
+tmp77 = s_spl1;
+} else {
+tmp77 = 0;
+}
+let tmp78 = 0;
+if (s_ms > 0) {
+s_mid = ((s_spl0 + s_spl1) * .5);
+s_side = (((s_spl0 - s_spl1) * .5) * s_sideg);
+tmp78 = s_side;
+} else {
+tmp78 = 0;
+}
+let tmp149 = 0;
+if (s_comp1 > 0) {
+let tmp113 = 0;
+if (s_ms < 1) {
+let tmp79 = s_spl0;
+fn_compL_comp(tmp79);
+let tmp95 = s_spl1;
+fn_compR_comp(tmp95);
+let tmp111 = s_compL_gv;
+let tmp112 = s_compR_gv;
+s_compgLR = minimum(tmp111, tmp112);
+s_spl0 *= ((s_compL_gv * (1 - s_link)) + (s_link * s_compgLR));
+s_spl1 *= ((s_compR_gv * (1 - s_link)) + (s_link * s_compgLR));
+tmp113 = s_spl1;
+} else {
+tmp113 = 0;
+}
+let tmp148 = 0;
+if (s_ms > 0) {
+let tmp114 = s_mid;
+fn_compM_comp(tmp114);
+let tmp130 = s_side;
+fn_compS_comp(tmp130);
+let tmp146 = s_compM_gv;
+let tmp147 = s_compS_gv;
+s_compgMS = minimum(tmp146, tmp147);
+s_mid *= ((s_compM_gv * (1 - s_link)) + (s_link * s_compgMS));
+s_side *= ((s_compS_gv * (1 - s_link)) + (s_link * s_compgMS));
+tmp148 = s_side;
+} else {
+tmp148 = 0;
+}
+tmp149 = tmp148;
+} else {
+tmp149 = 0;
+}
+let tmp180 = 0;
+if (s_sat > 0) {
+let tmp164 = 0;
+if (s_ms < 1) {
+let tmp150 = s_spl0;
+s_spl0 = (fn_satL_sat(tmp150) * s_satvol);
+let tmp157 = s_spl1;
+s_spl1 = (fn_satR_sat(tmp157) * s_satvol);
+tmp164 = s_spl1;
+} else {
+tmp164 = 0;
+}
+let tmp179 = 0;
+if (s_ms > 0) {
+let tmp165 = s_mid;
+s_mid = (fn_satM_sat(tmp165) * s_satvol);
+let tmp172 = s_side;
+s_side = (fn_satS_sat(tmp172) * s_satvol);
+tmp179 = s_side;
+} else {
+tmp179 = 0;
+}
+tmp180 = tmp179;
+} else {
+tmp180 = 0;
+}
+let tmp460 = 0;
+if (s_look > 0) {
+let tmp183 = 0;
+if (s_ms < 1) {
+let tmp181: Int = trunc(s_limL_buf+(s_pos));
+ram[tmp181] = s_spl0;
+s_liminL = ram[tmp181];
+let tmp182: Int = trunc(s_limR_buf+(s_pos));
+ram[tmp182] = s_spl1;
+s_liminR = ram[tmp182];
+tmp183 = s_liminR;
+} else {
+tmp183 = 0;
+}
+let tmp186 = 0;
+if (s_ms > 0) {
+let tmp184: Int = trunc(s_limM_buf+(s_pos));
+ram[tmp184] = s_mid;
+s_liminM = ram[tmp184];
+let tmp185: Int = trunc(s_limS_buf+(s_pos));
+ram[tmp185] = s_side;
+s_liminS = ram[tmp185];
+tmp186 = s_liminS;
+} else {
+tmp186 = 0;
+}
+s_pos += 1;
+let tmp187 = 0;
+if (s_pos >= s_bufsz) {
+s_pos = 0;
+tmp187 = s_pos;
+} else {
+tmp187 = 0;
+}
+let tmp276 = 0;
+if (s_ms < 1) {
+let tmp188 = s_liminL;
+let tmp189: Int = trunc(s_limL_buf+(s_pos));
+let tmp190 = ram[tmp189];
+let tmp191 = s_safe;
+fn_limL_limlook(tmp188, tmp190, tmp191);
+let tmp230 = s_liminR;
+let tmp231: Int = trunc(s_limR_buf+(s_pos));
+let tmp232 = ram[tmp231];
+let tmp233 = s_safe;
+fn_limR_limlook(tmp230, tmp232, tmp233);
+let tmp272 = s_limL_gb;
+let tmp273 = s_limR_gb;
+s_gminLR = minimum(tmp272, tmp273);
+let tmp274: Int = trunc(s_limL_buf+(s_pos));
+s_spl0 = (ram[tmp274] * ((s_limL_gb * (1 - s_link)) + (s_link * s_gminLR)));
+let tmp275: Int = trunc(s_limR_buf+(s_pos));
+s_spl1 = (ram[tmp275] * ((s_limR_gb * (1 - s_link)) + (s_link * s_gminLR)));
+tmp276 = s_spl1;
+} else {
+tmp276 = 0;
+}
+let tmp365 = 0;
+if (s_ms > 0) {
+let tmp277 = s_liminM;
+let tmp278: Int = trunc(s_limM_buf+(s_pos));
+let tmp279 = ram[tmp278];
+let tmp280 = s_safe;
+fn_limM_limlook(tmp277, tmp279, tmp280);
+let tmp319 = s_liminS;
+let tmp320: Int = trunc(s_limS_buf+(s_pos));
+let tmp321 = ram[tmp320];
+let tmp322 = s_safe;
+fn_limS_limlook(tmp319, tmp321, tmp322);
+let tmp361 = s_limM_gb;
+let tmp362 = s_limS_gb;
+s_gminMS = minimum(tmp361, tmp362);
+let tmp363: Int = trunc(s_limM_buf+(s_pos));
+s_mid = (ram[tmp363] * ((s_limM_gb * (1 - s_link)) + (s_link * s_gminMS)));
+let tmp364: Int = trunc(s_limS_buf+(s_pos));
+s_side = (ram[tmp364] * ((s_limS_gb * (1 - s_link)) + (s_link * s_gminMS)));
+tmp365 = s_side;
+} else {
+tmp365 = 0;
+}
+tmp460 = tmp365;
+} else {
+let tmp412 = 0;
+if (s_ms < 1) {
+let tmp366 = s_spl0;
+let tmp367 = s_safe;
+fn_limL_limit(tmp366, tmp367);
+let tmp388 = s_spl1;
+let tmp389 = s_safe;
+fn_limR_limit(tmp388, tmp389);
+let tmp410 = s_limL_gb;
+let tmp411 = s_limR_gb;
+s_gminLR = minimum(tmp410, tmp411);
+s_spl0 *= ((s_limL_gb * (1 - s_link)) + (s_link * s_gminLR));
+s_spl1 *= ((s_limR_gb * (1 - s_link)) + (s_link * s_gminLR));
+tmp412 = s_spl1;
+} else {
+tmp412 = 0;
+}
+let tmp459 = 0;
+if (s_ms > 0) {
+let tmp413 = s_mid;
+let tmp414 = s_safe;
+fn_limM_limit(tmp413, tmp414);
+let tmp435 = s_side;
+let tmp436 = s_safe;
+fn_limS_limit(tmp435, tmp436);
+let tmp457 = s_limM_gb;
+let tmp458 = s_limS_gb;
+s_gminMS = minimum(tmp457, tmp458);
+s_mid *= ((s_limM_gb * (1 - s_link)) + (s_link * s_gminMS));
+s_side *= ((s_limS_gb * (1 - s_link)) + (s_link * s_gminMS));
+tmp459 = s_side;
+} else {
+tmp459 = 0;
+}
+tmp460 = tmp459;
+}
+let tmp505 = 0;
+if (s_ms > 0) {
+s_left = ((s_mid + eelDivide(s_side,s_sideg)) * 1);
+s_right = ((s_mid - eelDivide(s_side,s_sideg)) * 1);
+s_spl0 = ((s_spl0 * (1 - s_ms)) + (s_ms * s_left));
+s_spl1 = ((s_spl1 * (1 - s_ms)) + (s_ms * s_right));
+let tmp461 = s_spl0;
+let tmp462 = 1;
+s_spl0 = fn_lim2L_limit(tmp461, tmp462);
+let tmp483 = s_spl1;
+let tmp484 = 1;
+s_spl1 = fn_lim2R_limit(tmp483, tmp484);
+tmp505 = s_spl1;
+} else {
+tmp505 = 0;
+}
+let tmp552 = 0;
+if (s_soft > 1) {
+let tmp506 = s_spl0;
+let tmp507 = s_soft;
+fn_softL_soft(tmp506, tmp507);
+let tmp527 = s_spl1;
+let tmp528 = s_soft;
+fn_softR_soft(tmp527, tmp528);
+let tmp548 = s_softL_outg;
+let tmp549 = ((s_softR_outg * s_link) + ((1 - s_link) * s_soft));
+s_spl0 *= minimum(tmp548, tmp549);
+let tmp550 = s_softR_outg;
+let tmp551 = ((s_softL_outg * s_link) + ((1 - s_link) * s_soft));
+s_spl1 *= minimum(tmp550, tmp551);
+tmp552 = s_spl1;
+} else {
+tmp552 = 0;
+}
+s_spl0 *= s_ceiling;
+s_spl1 *= s_ceiling;
+
+out1 = s_spl0;
+out2 = s_spl1;
+frame++;
+if (frame >= vectorsize()) frame = 0;

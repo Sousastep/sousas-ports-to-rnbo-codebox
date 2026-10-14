@@ -1,0 +1,35 @@
+Density3 — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/density3/
+
+What it is: the "Density" family compressor/limiter: a one-knob compressor
+with a built-in expanding "air" highpass feeding the drive so low frequencies
+don't overload it. The gain cell is sine-shaped, and above a certain drive it
+creatively distorts (a soft "densifying" saturation) rather than simply
+squashing. This RNBO port uses the original normalized 0..1 values.
+
+Parameters:
+
+- p_density (Density) 0..1, default 0.0
+  Compression/drive intensity. Internally density = p*5, i.e. an input gain
+  of up to 5x (+14 dB equivalent) into the sine gain cell. Guides:
+  0.0-0.1    bypass / near-bypass (default is NOT bypass - see below)
+  0.2        light, converges to almost the source output (flat)
+  0.4-0.6    heavy musical "densify" with harmonic bloom
+  0.8-1.0    limiting with visible distortion artifacts - use on busses only
+
+- p_highpas (Highpas) 0..1, default 0.0
+  Tames sub-bass from loading the gain cell: it is a highpass filter at a
+  cubic taper (iirAmount = p^3 / sampleRate). 0 = off; higher = faster
+  highpass (effectively higher cutoff). Musically: on big drums / big bass
+  busses, raise it so kicks don't eat the limiter's range.
+
+- p_output (Output) 0..1, default 1.0
+  Linear output trim (unity at 1.0).
+
+- p_drywet (Dry/Wet) 0..1, default 1.0
+  Linear dry/wet blend.
+
+Musical notes: default is not bypass (see README): unity output happens at
+p_density 0.2 with Highpas off; start there, push Density until the mix
+"opens up", then trim Output down. It's a master-buss tool first, but works
+on single tracks when you want density instead of visible compression.

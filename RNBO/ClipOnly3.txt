@@ -1,0 +1,146 @@
+/* ClipOnly3 — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+@state lastSampleL = 0;
+@state intermediateL = new FixedFloat64Array(18);
+@state slewL = new FixedFloat64Array(34);
+@state wasPosClipL = 0;
+@state wasNegClipL = 0;
+@state lastSampleR = 0;
+@state intermediateR = new FixedFloat64Array(18);
+@state slewR = new FixedFloat64Array(34);
+@state wasPosClipR = 0;
+@state wasNegClipR = 0;
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state spacing: Int = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+function init() {
+
+	lastSampleL = 0.0;
+	wasPosClipL = 0;
+	wasNegClipL = 0;
+	lastSampleR = 0.0;
+	wasPosClipR = 0;
+	wasNegClipR = 0;
+	for (let x: Int = 0; x < 17; x++) {intermediateL[x] = 0.0; intermediateR[x] = 0.0;}
+	for (let x: Int = 0; x < 33; x++) {slewL[x] = 0.0; slewR[x] = 0.0;}
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 1.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();
+	spacing = floor(overallscale); 
+	if (spacing < 1) spacing = 1; if (spacing > 16) spacing = 16;
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+
+		let noise = 1.0-(((fpdL)/4294967295.0)*0.076);
+		if (wasPosClipL == 1) { 
+			if (inputSampleL<lastSampleL) lastSampleL=(0.9085097*noise)+(inputSampleL*(1.0-noise));
+			else lastSampleL = 0.94; 
+		} wasPosClipL = 0;
+		if (inputSampleL>0.9085097) {wasPosClipL=1;inputSampleL=(0.9085097*noise)+(lastSampleL*(1.0-noise));}
+		if (wasNegClipL == 1) { 
+			if (inputSampleL > lastSampleL) lastSampleL=(-0.9085097*noise)+(inputSampleL*(1.0-noise));
+			else lastSampleL = -0.94;
+		} wasNegClipL = 0;
+		if (inputSampleL<-0.9085097) {wasNegClipL=1;inputSampleL=(-0.9085097*noise)+(lastSampleL*(1.0-noise));}
+		slewL[spacing*2] = abs(lastSampleL-inputSampleL);
+		for (let x: Int = spacing*2; x > 0; x--) slewL[x-1] = slewL[x];
+		intermediateL[spacing] = inputSampleL; inputSampleL = lastSampleL;
+		
+		for (let x: Int = spacing; x > 0; x--) {intermediateL[x-1] = intermediateL[x];} lastSampleL = intermediateL[0];
+		if (wasPosClipL || wasNegClipL) {
+			for (let x: Int = spacing; x > 0; x--) lastSampleL += intermediateL[x];
+			lastSampleL /= spacing;
+		} let finalSlew = 0.0;
+		for (let x: Int = spacing*2; x >= 0; x--) if (finalSlew < slewL[x]) finalSlew = slewL[x];
+		let postclip = 0.94 / (1.0+(finalSlew*1.3986013));
+		if (inputSampleL > postclip) inputSampleL = postclip; if (inputSampleL < -postclip) inputSampleL = -postclip;
+		
+		noise = 1.0-(((fpdR)/4294967295.0)*0.076);
+		if (wasPosClipR == 1) { 
+			if (inputSampleR<lastSampleR) lastSampleR=(0.9085097*noise)+(inputSampleR*(1.0-noise));
+			else lastSampleR = 0.94; 
+		} wasPosClipR = 0;
+		if (inputSampleR>0.9085097) {wasPosClipR=1;inputSampleR=(0.9085097*noise)+(lastSampleR*(1.0-noise));}
+		if (wasNegClipR == 1) { 
+			if (inputSampleR > lastSampleR) lastSampleR=(-0.9085097*noise)+(inputSampleR*(1.0-noise));
+			else lastSampleR = -0.94;
+		} wasNegClipR = 0;
+		if (inputSampleR<-0.9085097) {wasNegClipR=1;inputSampleR=(-0.9085097*noise)+(lastSampleR*(1.0-noise));}
+		slewR[spacing*2] = abs(lastSampleR-inputSampleR);
+		for (let x: Int = spacing*2; x > 0; x--) slewR[x-1] = slewR[x];
+		intermediateR[spacing] = inputSampleR; inputSampleR = lastSampleR;
+		
+		for (let x: Int = spacing; x > 0; x--) {intermediateR[x-1] = intermediateR[x];} lastSampleR = intermediateR[0];
+		if (wasPosClipR || wasNegClipR) {
+			for (let x: Int = spacing; x > 0; x--) lastSampleR += intermediateR[x];
+			lastSampleR /= spacing;
+		} finalSlew = 0.0;
+		for (let x: Int = spacing*2; x >= 0; x--) if (finalSlew < slewR[x]) finalSlew = slewR[x];
+		postclip = 0.94 / (1.0+(finalSlew*1.3986013));
+		if (inputSampleR > postclip) inputSampleR = postclip; if (inputSampleR < -postclip) inputSampleR = -postclip;
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;

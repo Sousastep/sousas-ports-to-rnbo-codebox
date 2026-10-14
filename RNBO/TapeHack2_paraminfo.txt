@@ -1,0 +1,29 @@
+TapeHack2 — Airwindows (Chris Johnson)
+Page: https://www.airwindows.com/tapehack2/
+
+What it is: a minimalist tape-style soft-saturator. Instead of trying to be
+conventional "hysteresis" tape emulation, TapeHack2 hits a soft saturation
+point, flattens the top (smoothly) and darkens the quiet parts, using a
+leveled cascade of "dark" averaging filters. Sounds like a recording
+console put into a mild analog clip. This RNBO port uses the original
+normalized 0..1 values.
+
+Parameters:
+
+- p_input (Input) 0..1, default 0.1
+  Drive into the saturator. Internally a gain of p*10, i.e. x10 (+20 dB)
+  at max; the default 0.1 is already a mild drive. Relentless attention:
+  even small pushes add real loudness, so do A/B at equal levels.
+
+- p_output (Output) 0..1, default 1.0
+  Output trim. Internally multiplied by 0.9239, so a small RTA-like loss is
+  baked in by the source; 1.0 is the calibrated setting.
+
+- p_drywet (Dry/Wet) 0..1, default 1.0
+  Linear dry/wet blend.
+
+Musical notes: use it on a single track (vocals, drums, bass) it adds a
+smeared-edge analog vibe; on a buss at the default 0.1 drive it is a
+subtle "warmer" glue. Beware of turning Input all the way up: it does NOT
+sound merely "louder", it adds real harmonic distortion and darkens
+transient bite. Set level by Output.

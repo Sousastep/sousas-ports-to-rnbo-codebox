@@ -1,0 +1,71 @@
+BandbAss 0.02 BETA — mrelwood plugins
+Page: https://mrelwood5.wixsite.com/plugins/bandbass
+(Individual page exists; the plugin ships in the free mrelwood_PluginPack.)
+
+What it is: a sidechain bass compressor: the LOW band of the main signal
+is compressed through a shelving LP filter whenever a sidechain kick hits,
+while the frequencies above the crossover stay untouched. In this RNBO
+port, in1/in2 is the bass, in3 is the kick sidechain, in4 is an optional
+second sidechain (channel4/auto detection). NOTE: with NO sidechain input
+the gain does eventually return to unity - the source does not implement
+the standalone compressor in its own description (README note). Parameter
+values keep the original JSFX slider units.
+
+Parameters (original names):
+
+- crossover   (Hz) 100..500, default 200
+  Band split frequency (shelving LP). Internally two LP chains at
+  1.2x and 0.8x of this value. 100-200 Hz snares other bass well;
+  300-500 leaves more mid-bass untouched.
+
+- threshold_kick  (dB) -40..0, default -20
+  Sidechain detector threshold. Full-scale kick = 0 dBFS, so -10..-20 is
+  a typical full-scale level; deeper/darker programs need threshold
+  higher up. Use the 'Link' parameter to make threshold_bass follow this.
+
+- threshold_bass  (dB) -40..0, default -20
+  Threshold for the bass source envelope. Optionally ignored when
+  link_thresholds is engaged (it then rides with threshold_kick).
+
+- attack  (slider units) 0..50, default 0
+  Attack of the duck: NOT milliseconds. Internally
+  attack = sampleRate * (0.5a + 0.5a^2) * 50ms with a = attack/50, so
+  it has its own non-linear taper; 0 = fastest (sample-level), 50 =
+  50 ms slower (smooth pump).
+
+- hold  (slider units) 0..100, default 0
+  Hold before release, same style of non-linear mapping
+  (a = hold/100, up to 100 ms). Longer holds unpump melodic bass
+  tracks with busy kicks.
+
+- release  (slider units) 10..300, default 30
+  Release of the duck, again non-linearly mapped:
+  rel = 5 + (0.25r + 0.75r^2) * 295 ms. Musically: 30-80 for fast
+  kick-following duck, 150-300 for a lazy swelling.
+
+- depth  (%) 0..200, default 100
+  Ducking depth: 100 = gain goes all the way down to the threshold
+  level; above 100 the source allows "over-compression" up to 2x
+  (depth2 = max(1, depth/100)) for a nasty, almost kick-gating feel.
+
+- stereo  (enum: 0 = Mono, 1 = Stereo) default 0
+  Default is Mono: the main inputs are averaged; Stereo mode keeps
+  both channels distinct. Even in Stereo the LEFT main envelope is
+  what controls both channels (source behavior).
+
+- channel4  (discrete: -1 = disabled, 0 = auto, +1 = enabled) default 0
+  Whether to pay attention to the optional second sidechain (in4).
+  'Auto' (0) means the source detects it by itself; -1 disables
+  and +1 forces it. Change this value to reset the detection state.
+
+- link_thresholds  (enum: 0 = Separate, 1 = Link) default 1
+  When 'Link', threshold_bass tracks threshold_kick, so you only set
+  one threshold. In the original JSFX this linking exists only as a
+  UI gesture, not in the DSP - the RNBO port implements it here as a
+  real DSP function, so automation works as you'd expect.
+
+Musical notes: for a classic "bass ducks under kick" track, set
+crossover ~150-250 Hz, thresholds around -10 to -20, Hold 0-30,
+Release 30-80 and Depth 100. The 0.02 BETA warning is real: check
+the source's silence behavior at very low level and don't rely on it
+as a general compressor without the kick sidechain.

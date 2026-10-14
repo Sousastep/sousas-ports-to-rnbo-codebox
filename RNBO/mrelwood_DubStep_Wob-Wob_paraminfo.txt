@@ -1,0 +1,52 @@
+DubStep Wob-Wob — mrelwood plugins
+Page: https://mrelwood5.wixsite.com/plugins
+(Wob-Wob has no individual page on the site; it is listed under Gain in
+the mrelwood plugin list and ships inside the free mrelwood_PluginPack.)
+
+What it is: the famous dubstep wobble - a volume (gain) automator driven
+by a pattern in beats. It is NOT a filter: it modulates simple gain, so you
+put it BEFORE your own filter to get the classic wub. The pattern is
+programmed into 56 step buttons driven by the beat inlet. IMPORTANT for
+the RNBO port: in3 is the CONTINUOUS BEAT POSITION in quarter notes (a
+0..N ramp you supply), and all pattern buttons default OFF, so it passes
+minimum gain until something is programmed and the beat is connected
+(README note).
+
+Parameters (original names):
+
+- slider1 (Freq Min) (Hz) 20..1000, default 20
+  The gain output stays at its MINIMUM gain while the pattern says so.
+  Unlike the real candidates above this plugin is volume-only, so this
+  slider instead sets where the modulation viewport starts on the
+  audio - think "floor" of the wobble. 200-500 Hz is a musical
+  sawage range, 20 is an on/off feel.
+
+- slider2 (Freq Max) (Hz) 100..20000, default 2000
+  Where the modulation tops out - the "ceiling" of the wobble shape.
+  Together with slider1 this shapes the face of the wobble ramp; with
+  a wide gap the range is dramatic, with a narrow gap it becomes an
+  on/off stutter.
+
+- slider3 (Offset) (beats) -4..+4, default 0
+  Slide the whole pattern left or right in beats relative to the beat
+  position. Positive = shift the pattern later. It is the knob you
+  turn to synchronize the wobble accents with other tracks.
+
+- slider4 (Steepness) 3..15, default 5
+  How sharply the wobble steps change: higher = snappier, more
+  staircase-like transitions (read "buttery"). Lower values (3-5)
+  keep a smooth, liquid wobble; above 8 you get hard steps
+  ("steppiness lasts forever", use with care).
+
+- sliderstep1..56 (Pattern buttons) 0/1, default all 0
+  The wobble pattern itself (56 slots). Slots 1-32 are spaced at 1/32 of
+  4 beats; slots 33-56 use the source's subsequent 1/24 spacing
+  (README notes). 0 = step off, 1 = step on. Use e.g.
+  'sliderstep1 1' to hear the basic wobble at minimum, then add
+  every 4th step for a classic "1-1-7" pattern.
+
+Notes for the RNBO port: pattern default-off means the module sits at
+MINIMUM gain until a beat position is provided and at least one step is
+turned ON - it does not generate its own tempo clock, REAPER-style
+pattern serialization is not ported (README note). You are expected to
+supply the beat ramp yourself (Max LE temporal clock, MIDI, or a ramp).

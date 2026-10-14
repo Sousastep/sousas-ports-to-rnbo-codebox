@@ -1,0 +1,290 @@
+/* VariMu — standalone RNBO codebox~ port
+ * in1/in2: left/right; out1/out2: left/right.
+ * Controls use original normalized VST values (0..1).
+ * Double-precision DSP path; no added output dither.
+ * Paste this entire file into codebox~ inside rnbo~.
+ * MIT License
+ * 
+ * Copyright (c) 2018 Chris Johnson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
+
+// VST A: Intensty
+@param({ min: 0, max: 1 }) p_intensty = 0.0;
+// VST B: Speed
+@param({ min: 0, max: 1 }) p_speed = 0.5;
+// VST C: Output
+@param({ min: 0, max: 1 }) p_output = 1.0;
+// VST D: Dry/Wet
+@param({ min: 0, max: 1 }) p_drywet = 1.0;
+
+@state muVaryL = 0;
+@state muAttackL = 0;
+@state muNewSpeedL = 0;
+@state muSpeedAL = 0;
+@state muSpeedBL = 0;
+@state muCoefficientAL = 0;
+@state muCoefficientBL = 0;
+@state previousL = 0;
+@state muVaryR = 0;
+@state muAttackR = 0;
+@state muNewSpeedR = 0;
+@state muSpeedAR = 0;
+@state muSpeedBR = 0;
+@state muCoefficientAR = 0;
+@state muCoefficientBR = 0;
+@state previousR = 0;
+@state flip = 0;
+@state fpdL = 305419896.0;
+@state fpdR = 2271560481.0;
+@state overallscale = 0;
+@state threshold = 0;
+@state muMakeupGain = 0;
+@state outGain = 0;
+@state release = 0;
+@state fastest = 0;
+@state output = 0;
+@state wet = 0;
+@state coefficient = 0;
+@state squaredSampleL = 0;
+@state squaredSampleR = 0;
+@state frame: Int = 0;
+// Xorshift32 with explicit unsigned wrapping (fixed, reproducible seeds).
+function unsigned32(x) {
+    return x - floor(x / 4294967296.0) * 4294967296.0;
+}
+function advanceRandom(x) {
+    let a: Int = x;
+    let left: Int = unsigned32(x * 8192.0);
+    let b: Int = unsigned32(a ^ left);
+    let shifted: Int = floor(b / 131072.0);
+    let c: Int = unsigned32(b ^ shifted);
+    left = unsigned32(c * 32.0);
+    return unsigned32(c ^ left);
+}
+function toIndex(x) {
+    let result: Int = trunc(x);
+    return result;
+}
+
+function init() {
+
+	muSpeedAL = 10000;
+	muSpeedBL = 10000;
+	muCoefficientAL = 1;
+	muCoefficientBL = 1;
+	muVaryL = 1;
+	previousL = 0.0;
+	
+	muSpeedAR = 10000;
+	muSpeedBR = 10000;
+	muCoefficientAR = 1;
+	muCoefficientBR = 1;
+	muVaryR = 1;
+	previousR = 0.0;
+	flip = 0;
+
+}
+function dspsetup() { frame = 0; }
+
+if (frame == 0) {
+overallscale = 2.0;
+	overallscale /= 44100.0;
+	overallscale *= samplerate();
+	
+	threshold = 1.001 - (1.0-pow(1.0-p_intensty,3));
+	muMakeupGain = sqrt(1.0 / threshold);
+	muMakeupGain = (muMakeupGain + sqrt(muMakeupGain))/2.0;
+	muMakeupGain = sqrt(muMakeupGain);
+	outGain = sqrt(muMakeupGain);
+	
+	release = pow((1.15-p_speed),5)*32768.0;
+	release /= overallscale;
+	fastest = sqrt(release);
+
+	output = outGain * p_output;
+	wet = p_drywet;
+
+}
+let sampleFrames = vectorsize() - frame - 1;
+let inFramesToProcess = vectorsize();
+
+		let inputSampleL = in1;
+		let inputSampleR = in2;
+
+		// Legacy ~1e-16 residue noise omitted; compression is unchanged.
+let drySampleL = inputSampleL;
+		let drySampleR = inputSampleR;
+		
+		if (abs(inputSampleL) > abs(previousL)) squaredSampleL = previousL * previousL;
+		else squaredSampleL = inputSampleL * inputSampleL;
+		previousL = inputSampleL;
+		inputSampleL *= muMakeupGain;
+		
+		if (abs(inputSampleR) > abs(previousR)) squaredSampleR = previousR * previousR;
+		else squaredSampleR = inputSampleR * inputSampleR;
+		previousR = inputSampleR;
+		inputSampleR *= muMakeupGain;
+
+		if (flip)
+		{
+			if (abs(squaredSampleL) > threshold)
+			{
+				muVaryL = threshold / abs(squaredSampleL);
+				muAttackL = sqrt(abs(muSpeedAL));
+				muCoefficientAL = muCoefficientAL * (muAttackL-1.0);
+				if (muVaryL < threshold)
+				{
+					muCoefficientAL = muCoefficientAL + threshold;
+				}
+				else
+				{
+					muCoefficientAL = muCoefficientAL + muVaryL;
+				}
+				muCoefficientAL = muCoefficientAL / muAttackL;
+			}
+			else
+			{
+				muCoefficientAL = muCoefficientAL * ((muSpeedAL * muSpeedAL)-1.0);
+				muCoefficientAL = muCoefficientAL + 1.0;
+				muCoefficientAL = muCoefficientAL / (muSpeedAL * muSpeedAL);
+			}
+			muNewSpeedL = muSpeedAL * (muSpeedAL-1);
+			muNewSpeedL = muNewSpeedL + abs(squaredSampleL*release)+fastest;
+			muSpeedAL = muNewSpeedL / muSpeedAL;
+		}
+		else
+		{
+			if (abs(squaredSampleL) > threshold)
+			{
+				muVaryL = threshold / abs(squaredSampleL);
+				muAttackL = sqrt(abs(muSpeedBL));
+				muCoefficientBL = muCoefficientBL * (muAttackL-1);
+				if (muVaryL < threshold)
+				{
+					muCoefficientBL = muCoefficientBL + threshold;
+				}
+				else
+				{
+					muCoefficientBL = muCoefficientBL + muVaryL;
+				}
+				muCoefficientBL = muCoefficientBL / muAttackL;
+			}
+			else
+			{
+				muCoefficientBL = muCoefficientBL * ((muSpeedBL * muSpeedBL)-1.0);
+				muCoefficientBL = muCoefficientBL + 1.0;
+				muCoefficientBL = muCoefficientBL / (muSpeedBL * muSpeedBL);
+			}
+			muNewSpeedL = muSpeedBL * (muSpeedBL-1);
+			muNewSpeedL = muNewSpeedL + abs(squaredSampleL*release)+fastest;
+			muSpeedBL = muNewSpeedL / muSpeedBL;
+		}
+
+		if (flip)
+		{
+			if (abs(squaredSampleR) > threshold)
+			{
+				muVaryR = threshold / abs(squaredSampleR);
+				muAttackR = sqrt(abs(muSpeedAR));
+				muCoefficientAR = muCoefficientAR * (muAttackR-1.0);
+				if (muVaryR < threshold)
+				{
+					muCoefficientAR = muCoefficientAR + threshold;
+				}
+				else
+				{
+					muCoefficientAR = muCoefficientAR + muVaryR;
+				}
+				muCoefficientAR = muCoefficientAR / muAttackR;
+			}
+			else
+			{
+				muCoefficientAR = muCoefficientAR * ((muSpeedAR * muSpeedAR)-1.0);
+				muCoefficientAR = muCoefficientAR + 1.0;
+				muCoefficientAR = muCoefficientAR / (muSpeedAR * muSpeedAR);
+			}
+			muNewSpeedR = muSpeedAR * (muSpeedAR-1);
+			muNewSpeedR = muNewSpeedR + abs(squaredSampleR*release)+fastest;
+			muSpeedAR = muNewSpeedR / muSpeedAR;
+		}
+		else
+		{
+			if (abs(squaredSampleR) > threshold)
+			{
+				muVaryR = threshold / abs(squaredSampleR);
+				muAttackR = sqrt(abs(muSpeedBR));
+				muCoefficientBR = muCoefficientBR * (muAttackR-1);
+				if (muVaryR < threshold)
+				{
+					muCoefficientBR = muCoefficientBR + threshold;
+				}
+				else
+				{
+					muCoefficientBR = muCoefficientBR + muVaryR;
+				}
+				muCoefficientBR = muCoefficientBR / muAttackR;
+			}
+			else
+			{
+				muCoefficientBR = muCoefficientBR * ((muSpeedBR * muSpeedBR)-1.0);
+				muCoefficientBR = muCoefficientBR + 1.0;
+				muCoefficientBR = muCoefficientBR / (muSpeedBR * muSpeedBR);
+			}
+			muNewSpeedR = muSpeedBR * (muSpeedBR-1);
+			muNewSpeedR = muNewSpeedR + abs(squaredSampleR*release)+fastest;
+			muSpeedBR = muNewSpeedR / muSpeedBR;
+		}
+
+		if (flip)
+		{
+			coefficient = (muCoefficientAL + pow(muCoefficientAL,2))/2.0;
+			inputSampleL *= coefficient;
+			coefficient = (muCoefficientAR + pow(muCoefficientAR,2))/2.0;
+			inputSampleR *= coefficient;
+		}
+		else
+		{
+			coefficient = (muCoefficientBL + pow(muCoefficientBL,2))/2.0;
+			inputSampleL *= coefficient;
+			coefficient = (muCoefficientBR + pow(muCoefficientBR,2))/2.0;
+			inputSampleR *= coefficient;
+		}
+
+		flip = !flip;		
+		
+		if (output < 1.0) {
+			inputSampleL *= output;
+			inputSampleR *= output;
+		}
+		if (wet < 1.0) {
+			inputSampleL = (drySampleL * (1.0-wet)) + (inputSampleL * wet);
+			inputSampleR = (drySampleR * (1.0-wet)) + (inputSampleR * wet);
+		}
+
+		fpdL = advanceRandom(fpdL);
+
+		fpdR = advanceRandom(fpdR);
+
+out1 = inputSampleL;
+out2 = inputSampleR;
+frame++;
+if (frame >= vectorsize()) frame = 0;
